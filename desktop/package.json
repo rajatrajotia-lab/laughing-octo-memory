@@ -1,0 +1,48 @@
+{
+  "name": "fuel-register",
+  "productName": "Fuel Register",
+  "version": "1.0.0",
+  "description": "Diesel fuel tracking: logbook, purchases, stock register and reports.",
+  "author": "Rajat Rajotia",
+  "license": "UNLICENSED",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.fuelregister.app",
+    "productName": "Fuel Register",
+    "files": [
+      "main.js",
+      "app/**/*"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Fuel Register",
+      "artifactName": "FuelRegister-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "FuelRegister-Portable-${version}.${ext}"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["universal"] }],
+      "icon": "build/icon.png",
+      "category": "public.app-category.business",
+      "artifactName": "FuelRegister-Mac-${version}.${ext}"
+    }
+  }
+}

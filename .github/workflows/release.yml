@@ -1,0 +1,110 @@
+name: Build app installers
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Bundle app into desktop wrapper
+        shell: bash
+        run: mkdir -p desktop/app && cp index.html desktop/app/index.html
+      - name: Install dependencies
+        working-directory: desktop
+        run: npm install
+      - name: Build Windows installer and portable exe
+        working-directory: desktop
+        run: npx electron-builder --win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            desktop/dist/FuelRegister-Setup-*.exe
+            desktop/dist/FuelRegister-Portable-*.exe
+
+  mac:
+    runs-on: macos-latest
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Bundle app into desktop wrapper
+        run: mkdir -p desktop/app && cp index.html desktop/app/index.html
+      - name: Install dependencies
+        working-directory: desktop
+        run: npm install
+      - name: Build Mac dmg
+        working-directory: desktop
+        run: npx electron-builder --mac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: desktop/dist/FuelRegister-Mac-*.dmg
+
+  android:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Bundle app into Android assets
+        run: mkdir -p android/app/src/main/assets && cp index.html android/app/src/main/assets/index.html
+      - name: Build APK
+        working-directory: android
+        run: gradle assembleRelease
+      - name: Align and sign APK
+        run: |
+          BT=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)
+          "$ANDROID_HOME/build-tools/$BT/zipalign" -f 4 \
+            android/app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+          "$ANDROID_HOME/build-tools/$BT/apksigner" sign \
+            --ks android/signing.p12 --ks-pass pass:fuelregister \
+            --out FuelRegister-1.0.0.apk aligned.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: FuelRegister-1.0.0.apk
+
+  release:
+    needs: [windows, mac, android]
+    if: always() && needs.windows.result == 'success' && needs.mac.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: files
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: Fuel Register 1.0.0
+          body: |
+            ## Fuel Register — downloads
+
+            | Device | File to download | How to install |
+            |---|---|---|
+            | Windows PC | `FuelRegister-Setup-1.0.0.exe` | Double-click. If Windows shows a blue "protected your PC" screen, click **More info → Run anyway** (the app is unsigned, not harmful). |
+            | Windows (no install) | `FuelRegister-Portable-1.0.0.exe` | Runs directly without installing — handy for USB drives. |
+            | Mac | `FuelRegister-Mac-1.0.0.dmg` | Open the dmg, drag Fuel Register to Applications. First launch: **right-click the app → Open → Open**. |
+            | Android phone | `FuelRegister-1.0.0.apk` | Open the file on the phone and allow "install from unknown sources" when prompted. |
+
+            The app works fully offline. Entries are saved on each device; use the app's Data Transfer screen to move records between devices.
+
+            You can also use it without installing anything at https://rajatrajotia-lab.github.io/laughing-octo-memory/
+          files: files/*
