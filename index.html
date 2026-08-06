@@ -2950,11 +2950,7 @@ function Dashboard({
     className: "r"
   }, "Purchased"), React.createElement("th", {
     className: "r"
-  }, "Issued from tank"), React.createElement("th", {
-    className: "r"
-  }, "Direct from pump"), React.createElement("th", {
-    className: "r"
-  }, "Total consumed"), React.createElement("th", {
+  }, "Consumed"), React.createElement("th", {
     className: "r"
   }, "Closing stock"), React.createElement("th", null, "Sites"))), React.createElement("tbody", null, daily.map(dy => React.createElement("tr", {
     key: dy.date,
@@ -2966,17 +2962,13 @@ function Dashboard({
     className: "r mono"
   }, fmt(dy.received, 1)), React.createElement("td", {
     className: "r mono"
-  }, fmt(dy.issued, 1)), React.createElement("td", {
-    className: "r mono"
-  }, fmt(dy.direct, 1)), React.createElement("td", {
-    className: "r mono"
   }, React.createElement("strong", null, fmt(dy.issued + dy.direct, 1))), React.createElement("td", {
     className: "r mono"
   }, dy.closing === null ? "—" : fmt(dy.closing, 1)), React.createElement("td", {
     className: "dl-sub2"
   }, Object.values(dy.sites).map(c => c.site.nick || c.site.name).join(", "))))))), React.createElement("p", {
     className: "dl-legend"
-  }, "One row per day across the whole company. Click a row for that day's site-wise and machine-wise break-up.")), React.createElement("div", {
+  }, "One row per day across the whole company. Click a row for that day's site-wise and machine-wise break-up, including how much came from the site tank against direct from the pump.")), React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
