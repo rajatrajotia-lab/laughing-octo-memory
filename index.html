@@ -2355,7 +2355,7 @@ function DieselLogbook() {
       slip: e.target.value
     }),
     placeholder: "e.g. 214"
-  })), React.createElement(F, {
+  })), machine.category !== "Subcontractor" && React.createElement(F, {
     label: (machine.meterType === "hours" ? "Opening HMR" : "Opening KM") + (carried !== null ? " — carried forward" : "")
   }, React.createElement("input", {
     type: "number",
@@ -2366,7 +2366,7 @@ function DieselLogbook() {
       ...form,
       open: e.target.value
     })
-  })), React.createElement(F, {
+  })), machine.category !== "Subcontractor" && React.createElement(F, {
     label: machine.meterType === "hours" ? "Closing HMR" : "Closing KM"
   }, React.createElement("input", {
     type: "number",
@@ -2385,7 +2385,7 @@ function DieselLogbook() {
     })
   }, SOURCES.map(x => React.createElement("option", {
     key: x
-  }, x)))), React.createElement(F, {
+  }, x)))), machine.category !== "Subcontractor" && React.createElement(F, {
     label: "Machine condition"
   }, React.createElement("select", {
     value: form.condition || "Working",
@@ -2395,7 +2395,7 @@ function DieselLogbook() {
     })
   }, CONDITIONS.map(x => React.createElement("option", {
     key: x
-  }, x)))), React.createElement(F, {
+  }, x)))), machine.category !== "Subcontractor" && React.createElement(F, {
     label: "Down time (hrs)"
   }, React.createElement("input", {
     type: "number",
@@ -2428,7 +2428,7 @@ function DieselLogbook() {
       litres: e.target.value
     })
   })), React.createElement(F, {
-    label: "Operator"
+    label: machine.category === "Subcontractor" ? "Received by" : "Operator"
   }, React.createElement("input", {
     value: form.operator,
     onChange: e => setForm({
@@ -4665,19 +4665,26 @@ function MachineDialog({
     ...m,
     [k]: v
   });
+  const isSub = m.category === "Subcontractor";
   const submit = () => {
-    if (!m.name.trim()) return setErr("Give the machine a name.");
-    if (!m.usage) return setErr("Choose what the machine is there for.");
-    if (!m.ownership) return setErr("Say whether this machine is owned or hired.");
-    if (m.ownership === "Hired" && num(m.rent) <= 0) return setErr("Enter the monthly hire rate for a hired machine.");
-    if (m.norm !== "" && num(m.norm) <= 0) return setErr("The standard must be a number above zero — leave it blank if not set.");
+    if (!m.name.trim()) return setErr(isSub ? "Give the subcontractor a name." : "Give the machine a name.");
+    if (!m.usage) return setErr("Choose what the fuel is drawn for.");
+    if (!isSub && !m.ownership) return setErr("Say whether this machine is owned or hired.");
+    if (!isSub && m.ownership === "Hired" && num(m.rent) <= 0) return setErr("Enter the monthly hire rate for a hired machine.");
+    if (!isSub && m.norm !== "" && num(m.norm) <= 0) return setErr("The standard must be a number above zero — leave it blank if not set.");
     const nm = m.name.trim().toLowerCase();
     const cd = String(m.code || "").trim().toLowerCase();
     const dupe = (existing || []).find(x => x.name.trim().toLowerCase() === nm && (!cd || String(x.code || "").trim().toLowerCase() === cd));
     if (dupe) return setErr("A machine with this name" + (cd ? " and registration number" : "") + " is already on this site.");
     onSave({
       ...m,
-      name: m.name.trim()
+      name: m.name.trim(),
+      ...(isSub ? {
+        ownership: "",
+        rent: "",
+        norm: "",
+        meterType: "km"
+      } : {})
     });
     onClose();
   };
@@ -4714,7 +4721,13 @@ function MachineDialog({
     value: ""
   }, "Select…"), USAGE.map(u => React.createElement("option", {
     key: u
-  }, u)))), React.createElement(F, {
+  }, u)))), isSub && React.createElement(F, {
+    label: "Contact person / firm (optional)"
+  }, React.createElement("input", {
+    value: m.owner || "",
+    onChange: e => set("owner", e.target.value),
+    placeholder: "who receives the fuel"
+  })), !isSub && React.createElement(F, {
     label: "Owned or hired",
     accent: true
   }, React.createElement("select", {
@@ -4724,7 +4737,7 @@ function MachineDialog({
     value: ""
   }, "Select…"), OWNERSHIP.map(o => React.createElement("option", {
     key: o
-  }, o)))), m.ownership === "Hired" && React.createElement(React.Fragment, null, React.createElement(F, {
+  }, o)))), !isSub && m.ownership === "Hired" && React.createElement(React.Fragment, null, React.createElement(F, {
     label: "Monthly hire rate (₹)",
     accent: true
   }, React.createElement("input", {
@@ -4745,7 +4758,7 @@ function MachineDialog({
     onChange: e => set("fuel", e.target.value)
   }, FUELS.map(f => React.createElement("option", {
     key: f
-  }, f)))), React.createElement(F, {
+  }, f)))), !isSub && React.createElement(F, {
     label: "Meter"
   }, React.createElement("select", {
     value: m.meterType,
@@ -4754,7 +4767,7 @@ function MachineDialog({
     value: "hours"
   }, "Hour meter (HMR)"), React.createElement("option", {
     value: "km"
-  }, "Odometer (KM)"))), React.createElement(F, {
+  }, "Odometer (KM)"))), !isSub && React.createElement(F, {
     label: m.meterType === "hours" ? "Norm consumption (L/hr)" : "Norm mileage (km/L)"
   }, React.createElement("input", {
     type: "number",
@@ -4769,7 +4782,7 @@ function MachineDialog({
   }, "Cancel"), React.createElement("button", {
     className: "dl-btn",
     onClick: submit
-  }, initial ? "Save changes" : "Add machine")), err && React.createElement("p", {
+  }, initial ? "Save changes" : "Add fuel user")), err && React.createElement("p", {
     className: "dl-formerr"
   }, err));
 }
