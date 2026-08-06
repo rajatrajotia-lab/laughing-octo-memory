@@ -6,9 +6,9 @@
 <title>Fuel Register</title>
 
 <link rel="manifest" href="manifest.webmanifest" />
-<meta name="theme-color" content="#0F1D2E" />
+<meta name="theme-color" content="#0C2B25" />
 <link rel="icon" href="icon-192.png" />
-<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBGMUQyRSIvPgo8cmVjdCB4PSIxNTAiIHk9IjEwNCIgd2lkdGg9IjQ2IiBoZWlnaHQ9IjMwNCIgZmlsbD0iI0UwOTUxQyIvPgo8cmVjdCB4PSIyMTQiIHk9IjEwNCIgd2lkdGg9IjE4IiBoZWlnaHQ9IjMwNCIgZmlsbD0iI0ZGRkZGRiIvPgo8cmVjdCB4PSIyNTAiIHk9IjEwNCIgd2lkdGg9IjQ2IiBoZWlnaHQ9IjMwNCIgZmlsbD0iI0UwOTUxQyIvPgo8cmVjdCB4PSIxNTAiIHk9IjEwNCIgd2lkdGg9IjE0NiIgaGVpZ2h0PSIzNCIgZmlsbD0iI0ZGRkZGRiIgb3BhY2l0eT0iMC45MiIvPgo8Y2lyY2xlIGN4PSIzNTIiIGN5PSIzNTYiIHI9IjQ2IiBmaWxsPSIjRTA5NTFDIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNTAiIHk9IjEwNCIgd2lkdGg9IjQ2IiBoZWlnaHQ9IjMwNCIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIyMTQiIHk9IjEwNCIgd2lkdGg9IjE4IiBoZWlnaHQ9IjMwNCIgZmlsbD0iI0ZGRkZGRiIvPgo8cmVjdCB4PSIyNTAiIHk9IjEwNCIgd2lkdGg9IjQ2IiBoZWlnaHQ9IjMwNCIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNTAiIHk9IjEwNCIgd2lkdGg9IjE0NiIgaGVpZ2h0PSIzNCIgZmlsbD0iI0ZGRkZGRiIgb3BhY2l0eT0iMC45MiIvPgo8Y2lyY2xlIGN4PSIzNTIiIGN5PSIzNTYiIHI9IjQ2IiBmaWxsPSIjQzg2QTE1Ii8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -16,16 +16,16 @@
 <meta name="mobile-web-app-capable" content="yes" />
 
 <style>
-  html,body{margin:0;padding:0;background:#E7ECF1;-webkit-text-size-adjust:100%;
+  html,body{margin:0;padding:0;background:#E8EEE9;-webkit-text-size-adjust:100%;
     overscroll-behavior-y:none;}
   #root{min-height:100vh;padding-top:env(safe-area-inset-top);
     padding-bottom:env(safe-area-inset-bottom);}
-  #boot{font:14px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif;color:#3A4E63;
+  #boot{font:14px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif;color:#33584C;
         padding:36px 22px;max-width:560px;margin:0 auto;}
-  #boot h1{font:600 17px/1.35 system-ui,sans-serif;color:#0F1D2E;margin:0 0 12px;}
+  #boot h1{font:600 17px/1.35 system-ui,sans-serif;color:#0C2B25;margin:0 0 12px;}
   #boot code{background:#fff;padding:1px 6px;border-radius:3px;font-size:12px;}
   .err{border-left:3px solid #C0392B;padding-left:15px;}
-  #memwarn{background:#FBEBCF;border-bottom:2px solid #B87708;color:#0F1D2E;
+  #memwarn{background:#FBEBCF;border-bottom:2px solid #8A4E0B;color:#0C2B25;
     font:12px/1.5 system-ui,sans-serif;padding:9px 14px;display:none;}
 </style>
 </head>
@@ -426,7 +426,10 @@ const {
 const STORE_KEY = "diesel:register:v1";
 const STOCK = "__stock__";
 const uid = () => Math.random().toString(36).slice(2, 10);
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 const num = v => {
   const n = parseFloat(v);
   return isNaN(n) ? 0 : n;
@@ -440,7 +443,7 @@ const monthLabel = k => {
   const [y, m] = k.split("-");
   return `${MONTHS[parseInt(m, 10) - 1]} ${y.slice(2)}`;
 };
-const SERIES = ["#E0951C", "#0F1D2E", "#3A6EA5", "#1D7A5B", "#8E5A9B", "#B87708", "#5C7C99", "#C0392B"];
+const SERIES = ["#C86A15", "#0C2B25", "#3A6EA5", "#1D7A5B", "#8E5A9B", "#8A4E0B", "#5C8F7E", "#C0392B"];
 const C_OK = "#1D7A5B";
 const C_WATCH = "#C98209";
 const C_OVER = "#C0392B";
@@ -520,6 +523,8 @@ function buildStock(list, machines, fuel) {
       received,
       receipts: rcpts,
       rcptRate,
+      value,
+      priced,
       unpriced: received - priced,
       total: opening + received,
       issues,
@@ -903,6 +908,130 @@ function importKSDP(d) {
   d.focusSite = site.id;
   return d;
 }
+const BUNDLE_FORMAT = "fuel-register/1";
+function exportBundle(data, siteId) {
+  const deep = x => JSON.parse(JSON.stringify(x));
+  const sites = data.sites.filter(s => siteId === "all" || s.id === siteId).map(deep);
+  const logs = {},
+    stock = {},
+    locks = {};
+  sites.forEach(s => {
+    stock[s.id] = deep(data.stock[s.id] || []);
+    s.machines.forEach(m => logs[m.id] = deep(data.logs[m.id] || []));
+    Object.keys(data.locks || {}).forEach(k => {
+      if (k.startsWith(s.id + ":")) locks[k] = deep(data.locks[k]);
+    });
+  });
+  return {
+    format: BUNDLE_FORMAT,
+    exported: today(),
+    rate: data.rate,
+    rateP: data.rateP,
+    sites,
+    logs,
+    stock,
+    locks
+  };
+}
+function mergeBundle(d, bundle, mode) {
+  const deep = x => JSON.parse(JSON.stringify(x));
+  const report = {
+    sites: 0,
+    machines: 0,
+    reports: 0,
+    entries: 0,
+    updated: 0,
+    skipped: 0
+  };
+  const norm = s => String(s || "").trim().toLowerCase();
+  d.logs = d.logs || {};
+  d.stock = d.stock || {};
+  d.locks = d.locks || {};
+  const siteMap = {};
+  const machineMap = {};
+  const allLocalMachineIds = () => new Set(d.sites.flatMap(s => s.machines.map(m => m.id)));
+  (bundle.sites || []).forEach(bs => {
+    let local = d.sites.find(s => s.id === bs.id) || d.sites.find(s => norm(s.name) === norm(bs.name));
+    if (!local) {
+      local = deep(bs);
+      local.machines = [];
+      d.sites.push(local);
+      report.sites += 1;
+    }
+    siteMap[bs.id] = local.id;
+    (bs.machines || []).forEach(bm => {
+      let lm = local.machines.find(m => m.id === bm.id) || bm.code && local.machines.find(m => norm(m.code) === norm(bm.code)) || local.machines.find(m => norm(m.name) === norm(bm.name));
+      if (!lm) {
+        lm = deep(bm);
+        if (allLocalMachineIds().has(lm.id)) lm.id = uid();
+        local.machines.push(lm);
+        report.machines += 1;
+      } else {
+        if (!num(lm.norm) && num(bm.norm)) lm.norm = bm.norm;
+        ["code", "owner", "usage", "ownership", "fuel", "meterType", "category"].forEach(f => {
+          if (!lm[f] && bm[f]) lm[f] = bm[f];
+        });
+      }
+      machineMap[bm.id] = lm.id;
+    });
+  });
+  (bundle.sites || []).forEach(bs => {
+    (bs.machines || []).forEach(bm => {
+      const localId = machineMap[bm.id];
+      const incoming = (bundle.logs || {})[bm.id] || [];
+      const logs = d.logs[localId] || (d.logs[localId] = []);
+      incoming.forEach(be => {
+        const e = deep(be);
+        if (e.siteId && siteMap[e.siteId]) e.siteId = siteMap[e.siteId];
+        const j = logs.findIndex(l => l.date === e.date && shiftOf(l) === shiftOf(e));
+        if (j >= 0) {
+          if (mode === "replace") {
+            e.id = logs[j].id;
+            logs[j] = e;
+            report.updated += 1;
+          } else {
+            report.skipped += 1;
+          }
+        } else {
+          if (logs.some(l => l.id === e.id)) e.id = uid();
+          logs.push(e);
+          report.entries += 1;
+        }
+      });
+    });
+    const localSiteId = siteMap[bs.id];
+    const incomingStock = (bundle.stock || {})[bs.id] || [];
+    const list = d.stock[localSiteId] || (d.stock[localSiteId] = []);
+    incomingStock.forEach(bd => {
+      const day = deep(bd);
+      const mapped = {};
+      Object.keys(day.issues || {}).forEach(k => {
+        mapped[machineMap[k] || k] = day.issues[k];
+      });
+      day.issues = mapped;
+      const j = list.findIndex(x => x.date === day.date && (x.fuel || "HSD") === (day.fuel || "HSD"));
+      if (j >= 0) {
+        if (mode === "replace") {
+          day.id = list[j].id;
+          list[j] = day;
+          report.updated += 1;
+        } else {
+          report.skipped += 1;
+        }
+      } else {
+        if (list.some(x => x.id === day.id)) day.id = uid();
+        list.push(day);
+        report.reports += 1;
+      }
+    });
+  });
+  Object.keys(bundle.locks || {}).forEach(k => {
+    const [sid, mon] = k.split(":");
+    const mappedKey = `${siteMap[sid] || sid}:${mon}`;
+    if (!d.locks[mappedKey]) d.locks[mappedKey] = deep(bundle.locks[k]);
+  });
+  return report;
+}
 function DieselLogbook() {
   const [data, setData] = useState(emptyData());
   const [loaded, setLoaded] = useState(false);
@@ -1012,12 +1141,18 @@ function DieselLogbook() {
       val = 0;
     (data.stock[siteId] || []).forEach(e => {
       if ((e.fuel || "HSD") !== fuel) return;
-      const q = num(e.received),
-        r = num(e.rate);
-      if (q > 0 && r > 0) {
-        qty += q;
-        val += q * r;
-      }
+      const rcpts = Array.isArray(e.receipts) && e.receipts.length ? e.receipts : num(e.received) > 0 ? [{
+        qty: num(e.received),
+        rate: e.rate || ""
+      }] : [];
+      rcpts.forEach(r => {
+        const q = num(r.qty),
+          rt = num(r.rate);
+        if (q > 0 && rt > 0) {
+          qty += q;
+          val += q * rt;
+        }
+      });
     });
     return qty > 0 ? val / qty : null;
   };
@@ -1098,14 +1233,12 @@ function DieselLogbook() {
       litres += r.litres;
     });
     const hours = machine.meterType === "hours";
-    const eff = hours ? run > 0 ? litres / run : null : litres > 0 ? run / litres : null;
+    const eff = hours ? run > 0 ? litres / run : null : litres > 0 && run > 0 ? run / litres : null;
     let downHrs = 0,
       downDays = 0;
     log.forEach(e => {
-      if (conditionOf(e) !== "Working") {
-        downDays += 1;
-        downHrs += downHoursOf(e);
-      }
+      downHrs += downHoursOf(e);
+      if (conditionOf(e) !== "Working" || downHoursOf(e) > 0) downDays += 1;
     });
     return {
       run,
@@ -1121,8 +1254,9 @@ function DieselLogbook() {
   }, [log, machine, data.stock, site]);
   const siteRoll = useMemo(() => {
     if (!site) return [];
-    return machines.map(m => {
-      const rows = (data.logs[m.id] || []).filter(inMonth);
+    return machines.map(raw => {
+      const m = withNorm(raw, site.id);
+      const rows = (data.logs[raw.id] || []).filter(e => inMonth(e) && entrySiteId(data, raw, e) === site.id);
       let run = 0,
         litres = 0;
       rows.forEach(e => {
@@ -1131,7 +1265,7 @@ function DieselLogbook() {
         litres += r.litres;
       });
       const hours = m.meterType === "hours";
-      const eff = hours ? run > 0 ? litres / run : null : litres > 0 ? run / litres : null;
+      const eff = hours ? run > 0 ? litres / run : null : litres > 0 && run > 0 ? run / litres : null;
       return {
         m,
         run,
@@ -1153,11 +1287,9 @@ function DieselLogbook() {
           bdHrs = 0;
         entries.forEach(e => {
           const c = conditionOf(e);
-          if (c !== "Working") {
-            down += 1;
-            downHrs += downHoursOf(e);
-            if (c === "Breakdown") bdHrs += downHoursOf(e);
-          }
+          downHrs += downHoursOf(e);
+          if (c === "Breakdown") bdHrs += downHoursOf(e);
+          if (c !== "Working" || downHoursOf(e) > 0) down += 1;
         });
         let run = 0,
           litres = 0,
@@ -1173,7 +1305,7 @@ function DieselLogbook() {
           }
         });
         const hrs = m.meterType === "hours";
-        const eff = hrs ? run > 0 ? litres / run : null : litres > 0 ? run / litres : null;
+        const eff = hrs ? run > 0 ? litres / run : null : litres > 0 && run > 0 ? run / litres : null;
         const d = days.size;
         return {
           m,
@@ -1230,10 +1362,11 @@ function DieselLogbook() {
           months: Object.values(byMonth).sort((a, b) => a.month < b.month ? 1 : -1),
           received: win.reduce((a, b) => a + b.received, 0),
           issued: win.reduce((a, b) => a + b.issued, 0),
-          closing: all.length ? all[0].closing : null,
-          last: all.length ? all[0].e.date : "",
+          closing: month === "all" ? all.length ? all[0].closing : null : win.length ? win[0].closing : null,
+          latestClosing: all.length ? all[0].closing : null,
+          last: month === "all" ? all.length ? all[0].e.date : "" : win.length ? win[0].e.date : "",
           days: win.length,
-          value: win.reduce((a, b) => a + b.received * (b.rcptRate || 0), 0),
+          value: win.reduce((a, b) => a + (b.value || 0), 0),
           rate: siteRate(s.id, f),
           unpriced: win.reduce((a, b) => a + (b.unpriced || 0), 0),
           locked: Object.keys(data.locks || {}).some(k => k.startsWith(s.id + ":") && (month === "all" || k === lockKey(s.id, month))),
@@ -1262,36 +1395,48 @@ function DieselLogbook() {
     });
   }, [data, month]);
   const trend = useMemo(() => {
+    const keyOf = {};
     const keys = [];
-    const byMonth = {};
     data.sites.forEach(s => {
       let key = s.nick || s.name;
       let n = 2;
       while (keys.includes(key)) key = `${s.name} (${n++})`;
       keys.push(key);
-      s.machines.forEach(m => (data.logs[m.id] || []).forEach(e => {
-        if (!e.date) return;
-        const k = e.date.slice(0, 7);
-        if (!byMonth[k]) byMonth[k] = {
-          month: k,
-          total: 0
-        };
-        byMonth[k][key] = (byMonth[k][key] || 0) + num(e.litres);
-        byMonth[k].total += num(e.litres);
+      keyOf[s.id] = key;
+    });
+    const make = fuel => {
+      const byMonth = {};
+      data.sites.forEach(s => s.machines.forEach(m => {
+        if (fuelOf(m) !== fuel) return;
+        (data.logs[m.id] || []).forEach(e => {
+          if (!e.date) return;
+          const key = keyOf[entrySiteId(data, m, e)] || keyOf[s.id];
+          const k = e.date.slice(0, 7);
+          if (!byMonth[k]) byMonth[k] = {
+            month: k,
+            total: 0
+          };
+          byMonth[k][key] = (byMonth[k][key] || 0) + num(e.litres);
+          byMonth[k].total += num(e.litres);
+        });
       }));
-    });
-    const rows = Object.keys(byMonth).sort().slice(-12).map(k => {
-      const r = {
-        ...byMonth[k]
+      const rows = Object.keys(byMonth).sort().slice(-12).map(k => {
+        const r = {
+          ...byMonth[k]
+        };
+        keys.forEach(key => r[key] = +(r[key] || 0).toFixed(1));
+        r.total = +r.total.toFixed(1);
+        r.label = monthLabel(k);
+        return r;
+      });
+      return {
+        rows,
+        keys
       };
-      keys.forEach(key => r[key] = +(r[key] || 0).toFixed(1));
-      r.total = +r.total.toFixed(1);
-      r.label = monthLabel(k);
-      return r;
-    });
+    };
     return {
-      rows,
-      keys
+      HSD: make("HSD"),
+      Petrol: make("Petrol")
     };
   }, [data]);
   const update = fn => setData(d => {
@@ -1345,7 +1490,26 @@ function DieselLogbook() {
   const removeSite = id => {
     update(d => {
       const s = d.sites.find(x => x.id === id);
-      s.machines.forEach(m => delete d.logs[m.id]);
+      if (!s) return;
+      s.machines.forEach(gone => {
+        const label = gone.name || "removed machine";
+        Object.keys(d.stock || {}).forEach(sid => {
+          if (sid === id) return;
+          (d.stock[sid] || []).forEach(day => {
+            const q = num((day.issues || {})[gone.id]);
+            if (q > 0) {
+              day.otherQty = num(day.otherQty) + q;
+              day.otherLabel = day.otherLabel ? `${day.otherLabel}, ${label}` : label;
+              delete day.issues[gone.id];
+            }
+          });
+        });
+        delete d.logs[gone.id];
+      });
+      delete d.stock[id];
+      Object.keys(d.locks || {}).forEach(k => {
+        if (k.startsWith(id + ":")) delete d.locks[k];
+      });
       d.sites = d.sites.filter(x => x.id !== id);
     });
     setSiteId(data.sites.find(s => s.id !== id)?.id || null);
@@ -1370,7 +1534,16 @@ function DieselLogbook() {
     if (dwn > SHIFT_HOURS) return setNote(`${fmt(dwn, 1)} hours down is more than the ${SHIFT_HOURS} hours in a shift.`);
     if (num(form.litres) < 0) return setNote("Fuel issued cannot be negative.");
     if (num(form.litres) === 0 && calcRow(form, machine).run <= 0 && num(form.downHours) <= 0) return setNote("Nothing to record — enter a closing reading, fuel issued, or down time.");
-    if (num(form.close) < num(form.open)) return setNote("Closing reading is lower than opening.");
+    const hasClose = form.close !== "" && form.close !== null && form.close !== undefined;
+    if (hasClose && num(form.close) < num(form.open)) return setNote("Closing reading is lower than opening.");
+    if (hasClose) {
+      const key = shiftKey({
+        date: form.date,
+        shift: sh
+      });
+      const later = (data.logs[machine.id] || []).filter(e => e.id !== editId && shiftKey(e) > key && e.open !== "" && e.open !== null && e.open !== undefined).sort((a, b) => shiftKey(a) < shiftKey(b) ? -1 : 1);
+      if (later.length && Math.abs(num(later[0].open) - num(form.close)) > 0.001) return setNote(`The next entry (${later[0].date}) opens on ${fmt(num(later[0].open), 1)} — this closing has to match it, or edit that entry first.`);
+    }
     update(d => {
       const arr = d.logs[machine.id] || (d.logs[machine.id] = []);
       if (editId) {
@@ -1416,7 +1589,7 @@ function DieselLogbook() {
     const i = from.machines.findIndex(m => m.id === mId);
     const m = from.machines[i];
     (d.logs[m.id] || []).forEach(e => {
-      if (!e.siteId && e.date < date) e.siteId = from.id;
+      if (!e.siteId && e.date <= date) e.siteId = from.id;
     });
     if (!Array.isArray(m.postings) || m.postings.length === 0) {
       const first = (d.logs[m.id] || []).reduce((a, e) => !a || e.date && e.date < a ? e.date : a, "");
@@ -1517,7 +1690,27 @@ function DieselLogbook() {
     if (isLocked(data, rec.siteId, rec.date)) return setNote(`${monthLabel(rec.date.slice(0, 7))} is locked for that site.`);
     if (!rec.date) return setNote("Give the receipt a date.");
     if (num(rec.qty) <= 0) return setNote("Enter the quantity received.");
+    if (rec.id) {
+      let src = null;
+      Object.keys(data.stock || {}).forEach(sid => (data.stock[sid] || []).forEach(day => {
+        if ((day.receipts || []).some(x => x.id === rec.id)) src = {
+          sid,
+          date: day.date
+        };
+      }));
+      if (src && isLocked(data, src.sid, src.date)) return setNote(`${monthLabel(src.date.slice(0, 7))} is locked for the site this receipt is currently on.`);
+    }
     update(d => {
+      if (rec.id) {
+        Object.keys(d.stock || {}).forEach(sid => {
+          (d.stock[sid] || []).forEach(day => {
+            if (sid === rec.siteId && day.date === rec.date && (day.fuel || "HSD") === f) return;
+            const j = (day.receipts || []).findIndex(x => x.id === rec.id);
+            if (j >= 0) day.receipts.splice(j, 1);
+          });
+          d.stock[sid] = (d.stock[sid] || []).filter(day => !((day.receipts || []).length === 0 && Object.values(day.issues || {}).every(q => !num(q)) && !num(day.otherQty) && (day.physical === "" || day.physical === null || day.physical === undefined) && !(day.remarks || "").trim()));
+        });
+      }
       const list = d.stock[rec.siteId] || (d.stock[rec.siteId] = []);
       let day = list.find(x => x.date === rec.date && (x.fuel || "HSD") === f);
       if (!day) {
@@ -1542,7 +1735,7 @@ function DieselLogbook() {
         ...day.receipts[i],
         ...body
       };else day.receipts.push({
-        id: uid(),
+        id: rec.id || uid(),
         ...body
       });
     });
@@ -1590,19 +1783,24 @@ function DieselLogbook() {
       Array.from(touched).map(id => (findMachine(d, id) || {}).m).filter(m => m && fuelOf(m) === (rec.fuel || "HSD")).forEach(m => {
         const qty = num((rec.issues || {})[m.id]);
         const logs = d.logs[m.id] || (d.logs[m.id] = []);
-        const idx = logs.findIndex(l => l.date === rec.date && shiftOf(l) === "Day" && (l.origin === "stock" || !l.origin));
+        const idx = logs.findIndex(l => l.date === rec.date && shiftOf(l) === "Day" && l.origin === "stock");
         if (qty > 0) {
-          if (idx >= 0) logs[idx].litres = qty;else logs.push({
-            ...blankEntry(),
-            id: uid(),
-            date: rec.date,
-            shift: "Day",
-            litres: qty,
-            origin: "stock",
-            siteId: site.id,
-            slip: rec.dcNo || "",
-            remarks: "from daily fuel report"
-          });
+          if (idx >= 0) {
+            logs[idx].litres = qty;
+          } else {
+            const manual = logs.find(l => l.date === rec.date && !l.origin && num(l.litres) > 0);
+            if (!manual) logs.push({
+              ...blankEntry(),
+              id: uid(),
+              date: rec.date,
+              shift: "Day",
+              litres: qty,
+              origin: "stock",
+              siteId: site.id,
+              slip: rec.dcNo || "",
+              remarks: "from daily fuel report"
+            });
+          }
         } else if (idx >= 0) logs.splice(idx, 1);
       });
     });
@@ -1621,22 +1819,26 @@ function DieselLogbook() {
   const doDeleteStock = rec => {
     update(d => {
       d.stock[site.id] = (d.stock[site.id] || []).filter(x => x.id !== rec.id);
+      const f = rec.fuel || "HSD";
       const s = d.sites.find(x => x.id === site.id);
-      s.machines.forEach(m => {
-        d.logs[m.id] = (d.logs[m.id] || []).filter(l => !(l.date === rec.date && l.origin === "stock"));
+      const ids = new Set([...Object.keys(rec.issues || {}), ...siteFleet(d, s).map(m => m.id)]);
+      ids.forEach(id => {
+        const fm = findMachine(d, id);
+        if (!fm || fuelOf(fm.m) !== f) return;
+        d.logs[id] = (d.logs[id] || []).filter(l => !(l.date === rec.date && l.origin === "stock" && (!l.siteId || l.siteId === site.id)));
       });
     });
     setNote("Fuel report removed.");
   };
   const exportCSV = () => {
     if (!site) return;
-    const head = ["Site", "Machine", "Code / Reg No", "Purpose", "Owned / Hired", "Hired From", "Hire Rate/Month", "Date", "Slip No", "Opening", "Closing", machine && machine.meterType === "km" ? "KM run" : "Hours run", "Fuel (L)", "Consumption", "Norm", "Operator", "Work / Location", "Remarks"];
+    const head = ["Site", "Machine", "Code / Reg No", "Purpose", "Owned / Hired", "Hired From", "Hire Rate/Month", "Date", "Slip No", "Opening", "Closing", machine ? machine.meterType === "km" ? "KM run" : "Hours run" : "Run (hrs or km)", "Fuel (L)", "Consumption", "Norm", "Operator", "Work / Location", "Remarks"];
     const list = machine ? [machine] : fleet;
     const rows = [];
     list.forEach(m => {
       (data.logs[m.id] || []).filter(inMonth).sort((a, b) => a.date > b.date ? 1 : -1).forEach(e => {
         const r = calcRow(e, m);
-        rows.push([site.name, m.name, m.code, usageOf(m), ownerOf(m), m.owner || "", ownerOf(m) === "Hired" ? m.rent || "" : "", e.date, e.slip, e.open, e.close, r.run, r.litres, r.eff === null ? "" : r.eff.toFixed(2), m.norm, e.operator, e.work, e.remarks]);
+        rows.push([site.name, m.name, m.code, usageOf(m), ownerOf(m), m.owner || "", ownerOf(m) === "Hired" ? m.rent || "" : "", e.date, e.slip, e.open, e.close, r.run, r.litres, r.eff === null ? "" : r.eff.toFixed(2), normFor(m, site.id), e.operator, e.work, e.remarks]);
       });
     });
     const csv = [head, ...rows].map(r => r.map(c => `"${String(c === undefined ? "" : c).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -1692,6 +1894,15 @@ function DieselLogbook() {
   }, [rawLog, machine]);
   const unit = machine ? machine.meterType === "hours" ? "L/hr" : "km/L" : "";
   const runUnit = machine ? machine.meterType === "hours" ? "hrs" : "km" : "";
+  if (!loaded) return React.createElement("div", {
+    className: "dl-root"
+  }, React.createElement("style", null, css), React.createElement("p", {
+    className: "dl-hint",
+    style: {
+      textAlign: "center",
+      padding: "60px 20px"
+    }
+  }, "Opening the register…"));
   return React.createElement(Guard, {
     label: "The register hit an error"
   }, React.createElement("div", {
@@ -1904,7 +2115,7 @@ function DieselLogbook() {
     unit: rates.HSD || rates.Petrol ? `at this site's own rates${rates.HSD ? ` · HSD ₹${fmt(rates.HSD, 2)}` : ""}${rates.Petrol ? ` · Petrol ₹${fmt(rates.Petrol, 2)}` : ""}` : "no rate entered on any receipt"
   }), React.createElement(Kpi, {
     label: "Hired plant",
-    value: "₹ " + fmt(machines.filter(m => ownerOf(m) === "Hired").reduce((a, m) => a + num(m.rent), 0), 0),
+    value: "₹ " + fmt(machines.filter(m => ownerOf(m) === "Hired").reduce((a, m) => a + rentFor(m, month === "all" ? null : month), 0), 0),
     unit: `per month · ${machines.filter(m => ownerOf(m) === "Hired").length} of ${machines.length} hired`
   }), React.createElement(Kpi, {
     label: "Machines over norm",
@@ -1932,7 +2143,7 @@ function DieselLogbook() {
       width: 150
     }
   }, "Against norm"))), React.createElement("tbody", null, siteRoll.map(r => React.createElement("tr", {
-    key: r.m.id,
+    key: (r.site ? r.site.id + ":" : "") + r.m.id,
     onClick: () => setMachineId(r.m.id),
     className: "click"
   }, React.createElement("td", null, React.createElement("strong", null, r.m.name), React.createElement("span", {
@@ -2341,19 +2552,23 @@ function DieselLogbook() {
   }, "delete this site"))), note && React.createElement("div", {
     className: "dl-note"
   }, note), dialog === "site" && React.createElement(SiteDialog, {
+    existing: data.sites,
     onClose: () => setDialog(null),
     onSave: addSite
   }), dialog === "machine" && React.createElement(MachineDialog, {
+    existing: machines,
     onClose: () => setDialog(null),
     onSave: addMachine
   }), dialog === "editSite" && site && React.createElement(SiteDialog, {
     initial: site,
+    existing: data.sites.filter(x => x.id !== site.id),
     onClose: () => setDialog(null),
     onSave: fields => renameSite(fields)
   }), dialog === "editMachine" && machine && React.createElement(MachineDialog, {
     initial: {
       ...machine
     },
+    existing: machines.filter(x => x.id !== machine.id),
     onClose: () => setDialog(null),
     onSave: fields => editMachine(fields)
   }), dialog === "move" && machine && site && React.createElement(MoveDialog, {
@@ -2447,7 +2662,7 @@ const TIP = {
     fill: "rgba(15,29,46,.05)"
   },
   contentStyle: {
-    background: "#0F1D2E",
+    background: "#0C2B25",
     border: "none",
     borderRadius: 3,
     fontSize: 12,
@@ -2458,7 +2673,7 @@ const TIP = {
     color: "#fff"
   },
   labelStyle: {
-    color: "#E0951C",
+    color: "#C86A15",
     fontWeight: 600,
     marginBottom: 4
   }
@@ -2496,11 +2711,16 @@ function Dashboard({
     };
   });
   const allRows = sites.flatMap(s => s.rows);
+  const fuelTrend = trend && trend[fuel] || {
+    rows: [],
+    keys: []
+  };
+  const machineCount = new Set(allRows.map(r => r.m.id)).size;
   const purchased = sites.reduce((a, b) => a + (b.st.received || 0), 0);
   const purchaseValue = sites.reduce((a, b) => a + (b.st.value || 0), 0);
   const unpriced = sites.reduce((a, b) => a + (b.st.unpriced || 0), 0);
   const issuedStock = sites.reduce((a, b) => a + (b.st.issued || 0), 0);
-  const consumed = issuedStock || allRows.reduce((a, b) => a + b.litres, 0);
+  const consumed = allRows.reduce((a, b) => a + b.litres, 0);
   const inHand = sites.reduce((a, b) => a + (b.st.closing || 0), 0);
   const cost = sites.reduce((a, b) => a + b.cost, 0);
   const entries = sites.reduce((a, b) => a + b.entries, 0);
@@ -2512,7 +2732,12 @@ function Dashboard({
       count: rs.length
     };
   }).filter(x => x.count > 0);
-  const hired = overview.flatMap(s => s.rows).filter(r => r.own === "Hired");
+  const seenHired = new Set();
+  const hired = overview.flatMap(s => s.rows).filter(r => {
+    if (r.own !== "Hired" || seenHired.has(r.m.id)) return false;
+    seenHired.add(r.m.id);
+    return true;
+  });
   const rentTotal = hired.reduce((a, r) => a + r.rent, 0);
   const useSplit = USAGE.map(u => {
     const rs = allRows.filter(r => r.usage === u);
@@ -2533,7 +2758,7 @@ function Dashboard({
   const rated = allRows.filter(r => r.variance !== null);
   let excess = 0;
   rated.forEach(r => {
-    if (r.variance === null || r.variance <= 0) return;
+    if (r.variance === null || !isFinite(r.variance) || r.variance <= 0) return;
     excess += r.litres * (r.variance / (100 + r.variance));
   });
   const sorted = allRows.slice().sort((a, b) => {
@@ -2549,7 +2774,7 @@ function Dashboard({
     value: +s.litres.toFixed(1)
   })).filter(d => d.value > 0);
   const litres = allRows.reduce((a, b) => a + b.litres, 0);
-  const varData = allRows.filter(r => r.variance !== null && r.count > 0).sort((a, b) => b.variance - a.variance).slice(0, 10).map(r => ({
+  const varData = allRows.filter(r => r.variance !== null && isFinite(r.variance) && r.count > 0).sort((a, b) => b.variance - a.variance).slice(0, 10).map(r => ({
     name: r.m.name.length > 18 ? r.m.name.slice(0, 17) + "…" : r.m.name,
     value: +r.variance.toFixed(1),
     status: r.status
@@ -2578,7 +2803,7 @@ function Dashboard({
     className: "dl-panel"
   }, React.createElement("div", {
     className: "dl-panelhead"
-  }, React.createElement("div", null, React.createElement("h2", null, fuel, " — all sites"), React.createElement("p", null, sites.length, " site", sites.length === 1 ? "" : "s", " · ", allRows.length, " machines ·", " ", month === "all" ? "all months" : monthLabel(month))), React.createElement("div", {
+  }, React.createElement("div", null, React.createElement("h2", null, fuel, " — all sites"), React.createElement("p", null, sites.length, " site", sites.length === 1 ? "" : "s", " · ", machineCount, " machines ·", " ", month === "all" ? "all months" : monthLabel(month))), React.createElement("div", {
     className: "dl-rowbtns"
   }, React.createElement("div", {
     className: "dl-switch"
@@ -2623,7 +2848,7 @@ function Dashboard({
   }), React.createElement(Kpi, {
     label: "Above standard",
     value: overStd.length,
-    unit: `of ${allRows.length} machines`,
+    unit: `of ${machineCount} machines`,
     alert: overStd.length > 0,
     onClick: () => setDrill("over")
   }), React.createElement(Kpi, {
@@ -2718,7 +2943,7 @@ function Dashboard({
     className: "r mono"
   }, fmt(purchased, 1)), React.createElement("td", {
     className: "r mono"
-  }, fmt(consumed, 1)), React.createElement("td", {
+  }, fmt(issuedStock, 1)), React.createElement("td", {
     colSpan: 2
   }), React.createElement("td", {
     className: "r mono"
@@ -2747,7 +2972,7 @@ function Dashboard({
   }, "Excess"), React.createElement("th", {
     className: "r"
   }, "Fuel drawn"))), React.createElement("tbody", null, overStd.slice().sort((a, b) => b.variance - a.variance).map(r => React.createElement("tr", {
-    key: r.m.id,
+    key: (r.site ? r.site.id + ":" : "") + r.m.id,
     className: "click",
     onClick: () => onOpen(r.site.id, r.m.id)
   }, React.createElement("td", null, React.createElement("strong", null, r.m.name), React.createElement("span", {
@@ -2788,7 +3013,7 @@ function Dashboard({
       key: s.site.id
     }, React.createElement("h4", null, s.site.nick || s.site.name, React.createElement("span", null, fmt(s.litres, 0), " L")), rows.map(r => React.createElement("div", {
       className: "dl-splitrow",
-      key: r.m.id,
+      key: (r.site ? r.site.id + ":" : "") + r.m.id,
       onClick: () => onOpen(r.site.id, r.m.id)
     }, React.createElement("span", {
       className: "dl-splitname"
@@ -2810,15 +3035,15 @@ function Dashboard({
     label: "The charts could not be drawn"
   }, React.createElement("div", {
     className: "dl-charts"
-  }, trend.rows.length > 0 && React.createElement("div", {
+  }, fuelTrend.rows.length > 0 && React.createElement("div", {
     className: "dl-chart wide"
   }, React.createElement("h3", {
     className: "dl-blockhead"
-  }, "Fuel issued by month, site-wise"), React.createElement(ResponsiveContainer, {
+  }, fuel, " logged by month, site-wise"), React.createElement(ResponsiveContainer, {
     width: "100%",
     height: 250
   }, React.createElement(BarChart, {
-    data: trend.rows,
+    data: fuelTrend.rows,
     margin: {
       top: 8,
       right: 8,
@@ -2842,9 +3067,9 @@ function Dashboard({
   }), React.createElement(Tooltip, {
     ...TIP,
     formatter: (v, n) => [`${fmt(v, 1)} L`, n]
-  }), trend.keys.length > 1 && React.createElement(Legend, {
+  }), fuelTrend.keys.length > 1 && React.createElement(Legend, {
     wrapperStyle: LEG
-  }), trend.keys.map((k, i) => React.createElement(Bar, {
+  }), fuelTrend.keys.map((k, i) => React.createElement(Bar, {
     key: k,
     dataKey: k,
     stackId: "a",
@@ -2911,7 +3136,7 @@ function Dashboard({
     formatter: v => [`${v >= 0 ? "+" : ""}${fmt(v, 1)}%`, "vs standard"]
   }), React.createElement(ReferenceLine, {
     x: 0,
-    stroke: "#0F1D2E",
+    stroke: "#0C2B25",
     strokeWidth: 1.5
   }), React.createElement(Bar, {
     dataKey: "value",
@@ -2925,7 +3150,7 @@ function Dashboard({
     formatter: v => `${v >= 0 ? "+" : ""}${fmt(v, 1)}%`,
     style: {
       fontSize: 10,
-      fill: "#3A4E63"
+      fill: "#33584C"
     }
   })))), React.createElement("p", {
     className: "dl-legend"
@@ -2947,7 +3172,7 @@ function Dashboard({
     strokeWidth: 2
   }, useSplit.map(d => React.createElement(Cell, {
     key: d.name,
-    fill: d.name === "Work oriented" ? "#0F1D2E" : d.name === "Ancillary" ? "#3A6EA5" : d.name === "Camp establishment" ? "#E0951C" : "#B9C4CF"
+    fill: d.name === "Work oriented" ? "#0C2B25" : d.name === "Ancillary" ? "#3A6EA5" : d.name === "Camp establishment" ? "#C86A15" : "#B9C4CF"
   }))), React.createElement(Tooltip, {
     ...TIP,
     formatter: (v, nm, pl) => [`${fmt(v, 0)} L · ${pct(v, litres)} · ${pl && pl.payload ? pl.payload.count : 0} machines`, nm]
@@ -2973,7 +3198,7 @@ function Dashboard({
     strokeWidth: 2
   }, ownSplit.map(d => React.createElement(Cell, {
     key: d.name,
-    fill: d.name === "Hired" ? "#B87708" : "#0F1D2E"
+    fill: d.name === "Hired" ? "#8A4E0B" : "#0C2B25"
   }))), React.createElement(Tooltip, {
     ...TIP,
     formatter: (v, nm, pl) => [`${fmt(v, 0)} L · ${pct(v, litres)} · ${pl && pl.payload ? pl.payload.count : 0} machines`, nm]
@@ -3018,7 +3243,7 @@ function Dashboard({
     formatter: v => [`${fmt(v, 0)} L`, "Fuel"]
   }), React.createElement(Bar, {
     dataKey: "value",
-    fill: "#0F1D2E",
+    fill: "#0C2B25",
     maxBarSize: 20
   }, React.createElement(LabelList, {
     dataKey: "value",
@@ -3026,7 +3251,7 @@ function Dashboard({
     formatter: v => fmt(v, 0),
     style: {
       fontSize: 10,
-      fill: "#3A4E63"
+      fill: "#33584C"
     }
   }))))), topUsers.length > 0 && React.createElement("div", {
     className: "dl-chart wide"
@@ -3075,7 +3300,7 @@ function Dashboard({
     formatter: v => `${fmt(v, 0)} L`,
     style: {
       fontSize: 10,
-      fill: "#3A4E63"
+      fill: "#33584C"
     }
   }))))))), React.createElement("div", {
     className: "dl-block"
@@ -3148,7 +3373,7 @@ function Dashboard({
     const u = r.m.meterType === "hours" ? "hrs" : "km";
     const eu = r.m.meterType === "hours" ? "L/hr" : "km/L";
     return React.createElement("tr", {
-      key: r.m.id,
+      key: (r.site ? r.site.id + ":" : "") + r.m.id,
       className: "click",
       onClick: () => onOpen(r.site.id, r.m.id)
     }, React.createElement("td", null, React.createElement("strong", null, r.m.name), React.createElement("span", {
@@ -3260,7 +3485,7 @@ function DrillDown({
       key: s.site.id
     }, React.createElement("h4", {
       className: "dl-drillsite"
-    }, s.site.name, React.createElement("span", null, fmt(s.st.issued || s.litres, 1), " L · ₹ ", fmt(s.cost, 0))), React.createElement("div", {
+    }, s.site.name, React.createElement("span", null, fmt(s.litres, 1), " L · ₹ ", fmt(s.cost, 0))), React.createElement("div", {
       className: "dl-tablewrap"
     }, React.createElement("table", {
       className: "dl-table"
@@ -3273,7 +3498,7 @@ function DrillDown({
     }, "Fuel"), React.createElement("th", {
       className: "r"
     }, "Consumption"))), React.createElement("tbody", null, s.rows.slice().sort((a, b) => b.litres - a.litres).map(r => React.createElement("tr", {
-      key: r.m.id,
+      key: (r.site ? r.site.id + ":" : "") + r.m.id,
       className: "click",
       onClick: () => {
         onOpen(s.site.id, r.m.id);
@@ -3343,7 +3568,7 @@ function DrillDown({
     }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Machine"), React.createElement("th", null, "Site"), React.createElement("th", null, "Hired from"), React.createElement("th", null, "Type"), React.createElement("th", {
       className: "r"
     }, "₹ per month"))), React.createElement("tbody", null, rows.map(r => React.createElement("tr", {
-      key: r.m.id,
+      key: (r.site ? r.site.id + ":" : "") + r.m.id,
       className: "click",
       onClick: () => {
         onOpen(r.site.id, r.m.id);
@@ -3383,7 +3608,7 @@ function DrillDown({
     }, "Excess"))), React.createElement("tbody", null, overStd.slice().sort((a, b) => b.variance - a.variance).map(r => {
       const ex = r.litres * (r.variance / (100 + r.variance));
       return React.createElement("tr", {
-        key: r.m.id,
+        key: (r.site ? r.site.id + ":" : "") + r.m.id,
         className: "click",
         onClick: () => {
           onOpen(r.site.id, r.m.id);
@@ -3432,7 +3657,20 @@ function NormMaster({
   const [onlyBlank, setOnlyBlank] = useState(false);
   const [sortBy, setSortBy] = useState("site");
   const [useF, setUseF] = useState("all");
-  const all = overview.flatMap(s => s.rows);
+  const all = (() => {
+    const seen = new Set();
+    return overview.flatMap(s => s.rows).filter(r => {
+      const home = r.site.machines.some(m => m.id === r.m.id);
+      if (seen.has(r.m.id)) return false;
+      if (home) {
+        seen.add(r.m.id);
+        return true;
+      }
+      const homeless = !overview.some(s2 => s2.site.machines.some(m => m.id === r.m.id));
+      if (homeless) seen.add(r.m.id);
+      return homeless;
+    });
+  })();
   const median = arr => {
     if (!arr.length) return null;
     const a = [...arr].sort((x, y) => x - y);
@@ -3586,7 +3824,7 @@ function NormMaster({
   }, "Variance"), React.createElement("th", null))), React.createElement("tbody", null, rows.map(r => {
     const unit = r.m.meterType === "hours" ? "L/hr" : "km/L";
     return React.createElement(React.Fragment, {
-      key: r.m.id
+      key: (r.site ? r.site.id + ":" : "") + r.m.id
     }, React.createElement("tr", null, React.createElement("td", null, React.createElement("input", {
       className: "dl-nameinput",
       value: r.m.name,
@@ -3907,14 +4145,16 @@ function StockRegister({
   const dateLocked = !!locks[lockKey(site.id, (form.date || "").slice(0, 7))];
   const fleet = machines.filter(m => fuelOf(m) === fuel && atSite(m, form.date));
   const notHere = machines.filter(m => fuelOf(m) === fuel && !atSite(m, form.date));
-  const isFirst = rows.length === 0 || editId && rows[rows.length - 1].e.id === editId;
-  const carried = rows.length ? rows[0].closing : 0;
-  const opening = editId ? isFirst ? num(form.opening) : (rows.find(r => r.e.id === editId) || {}).opening || 0 : isFirst ? num(form.opening) : carried;
-  const issuedNow = fleet.reduce((a, m) => a + num((form.issues || {})[m.id]), 0) + num(form.otherQty);
+  const others = editId ? rows.filter(r => r.e.id !== editId) : rows;
+  const isFirst = others.length === 0 || !!form.date && form.date < others[others.length - 1].e.date;
+  const prevRow = form.date ? others.find(r => r.e.date < form.date) : null;
+  const opening = isFirst ? num(form.opening) : prevRow ? prevRow.closing : 0;
+  const issuedNow = Object.keys(form.issues || {}).reduce((a, id) => a + num((form.issues || {})[id]), 0) + num(form.otherQty);
   const closingNow = opening + receivedOn - issuedNow;
   const dipDiff = form.physical === "" || form.physical === null ? null : num(form.physical) - closingNow;
   const inMonth = r => month === "all" || r.e.date.slice(0, 7) === month;
   const shown = rows.filter(inMonth);
+  const carried = month === "all" || !shown.length ? rows.length ? rows[0].closing : 0 : shown[0].closing;
   const received = shown.reduce((a, r) => a + r.received, 0);
   const issued = shown.reduce((a, r) => a + r.issued, 0);
   const days = shown.length;
@@ -4311,7 +4551,8 @@ function Gauge({
 function SiteDialog({
   onClose,
   onSave,
-  initial
+  initial,
+  existing
 }) {
   const [f, setF] = useState({
     name: initial && initial.name || "",
@@ -4330,6 +4571,8 @@ function SiteDialog({
     if (!f.nick.trim()) return setErr("A short name is needed — it labels charts and reports.");
     if (!f.client.trim()) return setErr("Enter the client or main contractor.");
     if (!f.location.trim()) return setErr("Enter the location or address.");
+    const dupe = (existing || []).find(s => s.name.trim().toLowerCase() === f.name.trim().toLowerCase());
+    if (dupe) return setErr("A site with this name already exists.");
     onSave({
       name: f.name.trim(),
       nick: f.nick.trim(),
@@ -4392,7 +4635,8 @@ function SiteDialog({
 function MachineDialog({
   onClose,
   onSave,
-  initial
+  initial,
+  existing
 }) {
   const [m, setM] = useState(initial || {
     name: "",
@@ -4416,6 +4660,11 @@ function MachineDialog({
     if (!m.usage) return setErr("Choose what the machine is there for.");
     if (!m.ownership) return setErr("Say whether this machine is owned or hired.");
     if (m.ownership === "Hired" && num(m.rent) <= 0) return setErr("Enter the monthly hire rate for a hired machine.");
+    if (m.norm !== "" && num(m.norm) <= 0) return setErr("The standard must be a number above zero — leave it blank if not set.");
+    const nm = m.name.trim().toLowerCase();
+    const cd = String(m.code || "").trim().toLowerCase();
+    const dupe = (existing || []).find(x => x.name.trim().toLowerCase() === nm && (!cd || String(x.code || "").trim().toLowerCase() === cd));
+    if (dupe) return setErr("A machine with this name" + (cd ? " and registration number" : "") + " is already on this site.");
     onSave({
       ...m,
       name: m.name.trim()
@@ -4546,7 +4795,7 @@ function purchaseRows(data, site, machines, month) {
 }
 function consumptionTable(data, site, machines, month, fuel) {
   const rows = buildStock(data.stock[site.id] || [], machines, fuel).slice().reverse().filter(r => inMon(r.e.date, month));
-  const cols = machines.filter(m => fuelOf(m) === fuel).filter(m => rows.some(r => num((r.e.issues || {})[m.id]) > 0));
+  const cols = machines.filter(m => rows.some(r => num((r.e.issues || {})[m.id]) > 0));
   const totals = cols.map(m => rows.reduce((a, r) => a + num((r.e.issues || {})[m.id]), 0));
   return {
     cols,
@@ -4564,24 +4813,23 @@ function summaryRows(data, machines, month, siteId) {
     const entries = (data.logs[m.id] || []).filter(e => inMon(e.date, month) && (!siteId || entrySiteId(data, m, e) === siteId));
     let run = 0,
       litres = 0,
-      down = 0,
       downHrs = 0,
       bdHrs = 0,
       direct = 0;
     const days = new Set();
+    const downDates = new Set();
     entries.forEach(e => {
       const r = calcRow(e, m);
       run += r.run;
       litres += r.litres;
       if (isDirect(e)) direct += r.litres;
       const cond = conditionOf(e);
-      if (cond !== "Working") {
-        down += 1;
-        downHrs += downHoursOf(e);
-        if (cond === "Breakdown") bdHrs += downHoursOf(e);
-      }
+      downHrs += downHoursOf(e);
+      if (cond === "Breakdown") bdHrs += downHoursOf(e);
+      if ((cond !== "Working" || downHoursOf(e) > 0) && e.date) downDates.add(e.date);
       if (e.date) days.add(e.date);
     });
+    const down = downDates.size;
     const hrs = m.meterType === "hours";
     const eff = hrs ? run > 0 ? litres / run : null : litres > 0 && run > 0 ? run / litres : null;
     return {
@@ -4623,7 +4871,7 @@ function buildWorkbook(data, site, month, want, chosen) {
   const wb = XLSX.utils.book_new();
   const used = new Set();
   const label = monthLabel(month);
-  const machines = site.machines;
+  const machines = siteFleet(data, site);
   if (want.purchase) {
     const rows = purchaseRows(data, site, machines, month);
     const aoa = [[`${site.name} — PURCHASE REGISTER`], [site.client || "", site.location || "", "", `Month: ${label}`], [`Extracted: ${today()}`], [], ["Date", "Fuel", "Challan / DC No.", "Supplier", "Received (L)", "Rate ₹/L", "Value ₹", "Opening (L)", "Closing (L)"]];
@@ -4657,14 +4905,14 @@ function buildWorkbook(data, site, month, want, chosen) {
       const lb = logbookRows(data, m, month, site.id);
       if (lb.entries.length === 0) return;
       const hrs = m.meterType === "hours";
-      const aoa = [[`${m.name}${m.code ? " — " + m.code : ""}`], [site.name, "", "", `Month: ${label}`], [`${m.category} · ${usageOf(m) || "purpose not set"} · ${ownerOf(m)}${m.owner ? " from " + m.owner : ""}`, "", "", `${fuelOf(m)} · standard ${num(m.norm) || "not set"} ${hrs ? "L/hr" : "km/L"}`], [], ["Date", "Shift", "Slip No.", hrs ? "Opening HMR" : "Opening KM", hrs ? "Closing HMR" : "Closing KM", hrs ? "Hours Run" : "KM Run", "Fuel (L)", hrs ? "L/hr" : "km/L", "Condition", "Down Hrs", "Reason", "Source", "Operator", "Work / Location", "Remarks"]];
+      const aoa = [[`${m.name}${m.code ? " — " + m.code : ""}`], [site.name, "", "", `Month: ${label}`], [`${m.category} · ${usageOf(m) || "purpose not set"} · ${ownerOf(m)}${m.owner ? " from " + m.owner : ""}`, "", "", `${fuelOf(m)} · standard ${num(normFor(m, site.id)) || "not set"} ${hrs ? "L/hr" : "km/L"}`], [], ["Date", "Shift", "Slip No.", hrs ? "Opening HMR" : "Opening KM", hrs ? "Closing HMR" : "Closing KM", hrs ? "Hours Run" : "KM Run", "Fuel (L)", hrs ? "L/hr" : "km/L", "Condition", "Down Hrs", "Reason", "Source", "Operator", "Work / Location", "Remarks"]];
       lb.entries.forEach(e => {
         const r = calcRow(e, m);
         aoa.push([e.date, shiftOf(e), e.slip || "", e.open === "" ? "" : num(e.open), e.close === "" ? "" : num(e.close), +r.run.toFixed(1), r.litres, r.eff === null ? "" : +r.eff.toFixed(2), conditionOf(e), downHoursOf(e) || "", e.downReason || "", e.source || "Site tank", e.operator || "", e.work || "", e.remarks || ""]);
       });
       aoa.push([]);
-      aoa.push(["TOTAL", "", "", "", +lb.run.toFixed(1), +lb.litres.toFixed(1), lb.eff === null ? "" : +lb.eff.toFixed(2)]);
-      aoa.push(["Standard", "", "", "", "", "", num(m.norm) || ""]);
+      aoa.push(["TOTAL", "", "", "", "", +lb.run.toFixed(1), +lb.litres.toFixed(1), lb.eff === null ? "" : +lb.eff.toFixed(2)]);
+      aoa.push(["Standard", "", "", "", "", "", "", num(normFor(m, site.id)) || ""]);
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       Object.assign(ws, widths([12, 8, 10, 14, 14, 11, 10, 10, 13, 10, 30, 17, 16, 30, 30]));
       XLSX.utils.book_append_sheet(wb, ws, sheetName(m.name, used));
@@ -4865,7 +5113,7 @@ function PurchaseReport({
     className: "r mono"
   }, fmt(total, 1)), React.createElement("td", {
     className: "r mono"
-  }, value > 0 && total > 0 ? fmt(value / total, 2) : "—"), React.createElement("td", {
+  }, value > 0 && priced > 0 ? fmt(value / priced, 2) : "—"), React.createElement("td", {
     className: "r mono"
   }, value > 0 ? fmt(value, 0) : "—"), React.createElement("td", {
     colSpan: 2
@@ -5009,7 +5257,7 @@ function SummaryReport({
   }, "Standard"), React.createElement("th", {
     className: "r"
   }, "Variance"))), React.createElement("tbody", null, rows.map(r => React.createElement("tr", {
-    key: r.m.id
+    key: (r.site ? r.site.id + ":" : "") + r.m.id
   }, React.createElement("td", null, React.createElement("strong", null, r.m.name), React.createElement("span", {
     className: "dl-sub"
   }, r.m.category, r.m.code ? ` · ${r.m.code}` : "", r.m.movedTo ? ` · since moved to ${r.m.movedTo}` : "")), React.createElement("td", {
@@ -5204,7 +5452,7 @@ function DataTransfer({
   const fileRef = useRef(null);
   const doExport = () => {
     const bundle = exportBundle(data, siteId);
-    const name = siteId === "all" ? "ALL_SITES" : (data.sites.find(s => s.id === siteId) || {}).name.replace(/[^A-Za-z0-9]+/g, "_");
+    const name = siteId === "all" ? "ALL_SITES" : ((data.sites.find(s => s.id === siteId) || {}).name || "SITE").replace(/[^A-Za-z0-9]+/g, "_");
     const blob = new Blob([JSON.stringify(bundle, null, 1)], {
       type: "application/json"
     });
@@ -5309,7 +5557,7 @@ function DataTransfer({
     onClick: onSetPass
   }, hasPasscode(data) ? "Change or remove passcode" : "Set a passcode")), React.createElement("section", {
     className: "dl-danger"
-  }, React.createElement("h4", null, "Start fresh"), React.createElement("p", null, "Clears every site, machine, fuel report and logbook entry from this copy, including the There is no undo and nothing is kept in the background — export a file first if you may want any of it back."), React.createElement("button", {
+  }, React.createElement("h4", null, "Start fresh"), React.createElement("p", null, "Clears every site, machine, fuel report and logbook entry from this copy, including the passcode and this device's role. There is no undo and nothing is kept in the background — export a file first if you may want any of it back."), React.createElement("button", {
     className: "dl-btn danger",
     onClick: () => {
       onClose();
@@ -5384,14 +5632,27 @@ function PasscodeDialog({
   const [hint, setHint] = useState(security && security.hint || "");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const misses = useRef(0);
+  const coolUntil = useRef(0);
   const submit = async () => {
     setErr("");
     if (mode === "enter") {
       if (!code) return setErr("Enter the passcode.");
+      const wait = Math.ceil((coolUntil.current - Date.now()) / 1000);
+      if (wait > 0) return setErr(`Too many wrong tries — wait ${wait} seconds.`);
       setBusy(true);
       const h = await hashCode(code, security.salt);
       setBusy(false);
-      if (h !== security.hash) return setErr("That passcode is not right.");
+      if (h !== security.hash) {
+        misses.current += 1;
+        if (misses.current >= 5) {
+          coolUntil.current = Date.now() + 30000;
+          misses.current = 0;
+          return setErr("Too many wrong tries — wait 30 seconds.");
+        }
+        return setErr("That passcode is not right.");
+      }
+      misses.current = 0;
       onOk();
       onClose();
       return;
@@ -5480,16 +5741,27 @@ function ConfirmDialog({
     autoFocus: true
   }, label || "Confirm")));
 }
+const modalStack = [];
 function Modal({
   title,
   children,
   onClose,
   wide
 }) {
+  const me = useRef({});
   useEffect(() => {
-    const h = e => e.key === "Escape" && onClose();
+    modalStack.push(me.current);
+    const h = e => {
+      if (e.key !== "Escape") return;
+      if (modalStack[modalStack.length - 1] !== me.current) return;
+      onClose();
+    };
     window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
+    return () => {
+      const i = modalStack.indexOf(me.current);
+      if (i >= 0) modalStack.splice(i, 1);
+      window.removeEventListener("keydown", h);
+    };
   }, [onClose]);
   return React.createElement("div", {
     className: "dl-scrim",
@@ -5514,20 +5786,20 @@ const css = `
 @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
 .dl-root{
-  --ink:#0C1826; --ink-2:#1B3049; --steel:#33475D; --mute:#5C7188;
-  --rule:#C3CFDC; --rule-2:#E0E7EF;
-  --paper:#E9EEF3; --card:#FFFFFF; --amber:#E0951C; --amber-dk:#96600A;
+  --ink:#0C2B25; --ink-2:#164439; --steel:#33584C; --mute:#5C7C6F;
+  --rule:#C2D2CA; --rule-2:#DFE9E3;
+  --paper:#E8EEE9; --card:#FFFFFF; --amber:#C86A15; --amber-dk:#8A4E0B;
   --ok:#156B4E; --watch:#A56F0A; --over:#B3311F;
   --r:5px; --r-sm:3px;
-  --sh-1:0 1px 3px rgba(12,24,38,.10);
-  --sh-2:0 3px 12px -3px rgba(12,24,38,.18);
-  --sh-3:0 12px 34px -10px rgba(12,24,38,.32);
+  --sh-1:0 1px 3px rgba(10,30,26,.10);
+  --sh-2:0 3px 12px -3px rgba(10,30,26,.18);
+  --sh-3:0 12px 34px -10px rgba(10,30,26,.32);
   background:var(--paper); color:var(--ink);
   font-family:'Inter',system-ui,-apple-system,sans-serif;
   font-size:14px; line-height:1.5; min-height:100%; padding:20px 22px 40px;
   -webkit-font-smoothing:antialiased;
 }
-.dl-root ::selection{background:rgba(224,149,28,.28);}
+.dl-root ::selection{background:rgba(200,106,21,.28);}
 .dl-root *{box-sizing:border-box;}
 .dl-root h1,.dl-root h2,.dl-root h3{
   font-family:'Oswald','Arial Narrow',sans-serif; font-weight:600;
@@ -5552,15 +5824,15 @@ const css = `
   font-weight:700;}
 .dl-field input,.dl-field select{
   font:inherit;font-size:14px;font-weight:500;padding:9px 11px;min-height:40px;
-  border:1px solid #93A5B8;border-radius:var(--r-sm);
+  border:1px solid #8FA79B;border-radius:var(--r-sm);
   background:var(--card);color:var(--ink);min-width:0;transition:border-color .12s,box-shadow .12s;
 }
 .dl-field input:hover:not(:disabled),.dl-field select:hover:not(:disabled){border-color:var(--steel);}
 .dl-field.accent>span::after{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;
   background:var(--amber);margin-left:5px;vertical-align:2px;}
-.dl-field.accent input,.dl-field.accent select{border-color:#D9A94E;background:#FFFCF5;}
+.dl-field.accent input,.dl-field.accent select{border-color:#CE9550;background:#FFFCF5;}
 .dl-field input:focus,.dl-field select:focus{outline:none;border-color:var(--amber-dk);
-  box-shadow:0 0 0 3px rgba(224,149,28,.30);}
+  box-shadow:0 0 0 3px rgba(200,106,21,.30);}
 .dl-field input:disabled{background:#EDF1F5;color:var(--steel);cursor:not-allowed;}
 .dl-field.wide{grid-column:span 2;}
 
@@ -5607,7 +5879,7 @@ const css = `
 .dl-gaugewrap{margin:0 0 18px;}
 .dl-gauge{font-size:11px;}
 .dl-gauge.idle{color:var(--mute);font-style:italic;}
-.dl-track{position:relative;height:11px;display:flex;border:1px solid #93A5B8;overflow:visible;}
+.dl-track{position:relative;height:11px;display:flex;border:1px solid #8FA79B;overflow:visible;}
 .dl-gauge.big .dl-track{height:19px;}
 .dl-zone{height:100%;}
 .dl-zone.ok{width:52.5%;background:#C4E5D6;}
@@ -5626,7 +5898,7 @@ const css = `
 .dl-gaugeread.over{color:var(--over);}
 
 /* form */
-.dl-form{border:1px solid var(--rule);border-left:4px solid var(--ink);border-radius:var(--r);background:#F4F7FA;
+.dl-form{border:1px solid var(--rule);border-left:4px solid var(--ink);border-radius:var(--r);background:#F2F6F2;
   padding:18px 18px 16px;margin-bottom:24px;}
 .dl-formhead{font-family:'Oswald','Arial Narrow',sans-serif;text-transform:uppercase;letter-spacing:.08em;
   font-size:14px;font-weight:600;margin-bottom:10px;display:flex;gap:10px;align-items:center;}
@@ -5638,17 +5910,17 @@ const css = `
 /* table */
 .dl-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px;}
 .dl-table th{text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
-  color:#E5EBF3;font-weight:700;padding:11px 10px;white-space:nowrap;
+  color:#E3EEE7;font-weight:700;padding:11px 10px;white-space:nowrap;
   border-bottom:3px solid var(--amber);background:var(--ink);
   position:sticky;top:0;z-index:2;}
 .dl-table td{padding:11px 10px;border-bottom:1px solid var(--rule-2);vertical-align:top;font-weight:500;}
 .dl-table tbody tr:last-child td{border-bottom:none;}
 .dl-table .r{text-align:right;}
-.dl-table tbody tr:hover{background:#EEF3F8;}
+.dl-table tbody tr:hover{background:#EBF2ED;}
 .dl-table tr.click{cursor:pointer;}
 .dl-table tr.click:hover td:first-child{box-shadow:inset 4px 0 0 var(--amber);}
 .dl-table tfoot td{border-top:2px solid var(--ink);border-bottom:none;font-weight:700;
-  background:#EFF3F7;padding:12px 10px;
+  background:#ECF2ED;padding:12px 10px;
   font-family:ui-monospace,monospace;font-size:13px;}
 .dl-table tfoot tr:first-child td:first-child{border-radius:0 0 0 var(--r-sm);}
 .dl-table tfoot tr:first-child td:last-child{border-radius:0 0 var(--r-sm) 0;}
@@ -5660,7 +5932,7 @@ const css = `
 .nowrap{white-space:nowrap;}
 
 /* view switch */
-.dl-switch{display:flex;gap:3px;padding:4px;background:#CBD6E1;border-radius:var(--r);}
+.dl-switch{display:flex;gap:3px;padding:4px;background:#C6D6CB;border-radius:var(--r);}
 .dl-switch button{font-family:'Oswald','Arial Narrow',sans-serif;text-transform:uppercase;
   letter-spacing:.06em;font-size:12.5px;font-weight:600;padding:9px 15px;border:none;background:transparent;
   color:var(--steel);cursor:pointer;border-radius:var(--r-sm);transition:background .12s,color .12s;}
@@ -5678,7 +5950,7 @@ const css = `
 .dl-issuehead{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--steel);
   font-weight:700;margin:14px 0 8px;padding-top:10px;border-top:2px dashed var(--rule);}
 .dl-recon{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px;padding:11px 13px;
-  background:#EAF0F5;border-left:4px solid var(--amber);font-size:12.5px;color:var(--steel);font-weight:500;}
+  background:#E7EFE9;border-left:4px solid var(--amber);font-size:12.5px;color:var(--steel);font-weight:500;}
 .dl-recon b{font-family:ui-monospace,monospace;color:var(--ink);font-size:13.5px;}
 .dl-recon .op{color:var(--mute);font-weight:700;}
 .dl-recon .res b{color:var(--amber-dk);}
@@ -5687,7 +5959,7 @@ const css = `
 .dl-tag.ok{background:#C4E5D6;color:var(--ok);}
 .dl-tag.over{background:#F2C6BE;color:var(--over);}
 .dl-chips{display:flex;flex-wrap:wrap;gap:5px;}
-.dl-chip{font-size:11px;font-weight:500;background:#E6ECF2;border:1px solid var(--rule);border-radius:2px;
+.dl-chip{font-size:11px;font-weight:500;background:#E3ECE5;border:1px solid var(--rule);border-radius:2px;
   padding:2px 8px;white-space:nowrap;}
 .dl-chip b{font-family:ui-monospace,monospace;}
 
@@ -5711,7 +5983,7 @@ const css = `
 
 .dl-own{display:inline-block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;
   font-weight:700;padding:2px 8px;border-radius:2px;}
-.dl-own.own{background:#D9E2EB;color:var(--ink);}
+.dl-own.own{background:#D5E3DA;color:var(--ink);}
 .dl-own.hired{background:#F6DFAC;color:var(--amber-dk);}
 
 .dl-formerr{color:var(--over);font-size:12.5px;font-weight:700;margin:8px 0 0;text-align:right;}
@@ -5724,7 +5996,7 @@ const css = `
 /* extract */
 .dl-xferintro{font-size:12.5px;color:var(--steel);line-height:1.6;margin:0 0 14px;font-weight:500;}
 .dl-picks{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:8px;margin-bottom:6px;}
-.dl-pick{display:flex;gap:9px;align-items:flex-start;border:1px solid #93A5B8;border-radius:var(--r-sm);
+.dl-pick{display:flex;gap:9px;align-items:flex-start;border:1px solid #8FA79B;border-radius:var(--r-sm);
   padding:10px 12px;cursor:pointer;background:var(--card);}
 .dl-pick.on{border-color:var(--amber-dk);background:#FFF8EA;box-shadow:inset 0 0 0 1px var(--amber-dk);}
 .dl-pick input{margin-top:2px;width:15px;height:15px;accent-color:var(--amber-dk);}
@@ -5749,7 +6021,7 @@ const css = `
 .dl-btn:disabled{opacity:.45;cursor:not-allowed;}
 
 .dl-cond{display:inline-block;font-size:10px;letter-spacing:.05em;text-transform:uppercase;
-  font-weight:700;padding:2px 7px;border-radius:2px;background:#D9E2EB;color:var(--steel);}
+  font-weight:700;padding:2px 7px;border-radius:2px;background:#D5E3DA;color:var(--steel);}
 .dl-cond.breakdown{background:#F2C6BE;color:var(--over);}
 .dl-cond.idle,.dl-cond.standby{background:#F6DFAC;color:var(--amber-dk);}
 
@@ -5767,10 +6039,10 @@ const css = `
 .dl-split h4 span{font-family:ui-monospace,monospace;font-size:13px;color:var(--amber-dk);}
 .dl-splitrow{display:grid;grid-template-columns:1fr 90px 52px 46px;gap:8px;align-items:center;
   padding:3px 0;cursor:pointer;}
-.dl-splitrow:hover{background:#EEF3F8;}
+.dl-splitrow:hover{background:#EBF2ED;}
 .dl-splitname{font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.dl-splitbar{display:block;height:10px;background:#D7DFE7;}
-.dl-splitbar i{display:block;height:100%;background:#2F639C;}
+.dl-splitbar{display:block;height:10px;background:#D3E0D7;}
+.dl-splitbar i{display:block;height:100%;background:#2C7A64;}
 .dl-splitbar i.over{background:var(--over);}
 .dl-splitbar i.watch{background:var(--watch);}
 .dl-splitbar i.ok{background:var(--ok);}
@@ -5796,7 +6068,7 @@ const css = `
 .dl-confirmbody{font-size:13.5px;line-height:1.65;color:var(--ink);margin:0;font-weight:500;}
 
 .dl-checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;}
-.dl-checks>div{border:1px solid var(--rule);border-left:5px solid var(--ok);background:#F7F9FB;
+.dl-checks>div{border:1px solid var(--rule);border-left:5px solid var(--ok);background:#F5F8F5;
   padding:11px 13px;display:flex;gap:11px;align-items:baseline;}
 .dl-checks>div.bad{border-left-color:var(--over);background:#FBEFEC;}
 .dl-checks>div.warn{border-left-color:var(--watch);background:#FCF4E2;}
@@ -5811,9 +6083,9 @@ const css = `
 .dl-shift{display:inline-block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;
   font-weight:700;padding:1px 7px;border-radius:2px;margin-left:6px;vertical-align:1px;}
 .dl-shift.day{background:#F6DFAC;color:var(--amber-dk);}
-.dl-shift.night{background:#CFD9E4;color:var(--ink);}
+.dl-shift.night{background:#CCDCD2;color:var(--ink);}
 
-.dl-recnote{font-size:11.5px;color:var(--steel);background:#EAF0F5;border-left:4px solid var(--amber);
+.dl-recnote{font-size:11.5px;color:var(--steel);background:#E7EFE9;border-left:4px solid var(--amber);
   padding:10px 12px;margin-top:12px;line-height:1.5;font-weight:500;}
 
 .dl-guard{border:1px solid var(--rule);border-left:5px solid var(--watch);background:#FCF4E2;
@@ -5823,7 +6095,7 @@ const css = `
 .dl-guard .dl-link{align-self:flex-start;}
 
 /* access */
-.dl-access{border:1px solid var(--rule);border-radius:var(--r-sm);background:#F7F9FB;padding:14px;margin-top:16px;}
+.dl-access{border:1px solid var(--rule);border-radius:var(--r-sm);background:#F5F8F5;padding:14px;margin-top:16px;}
 .dl-access h4{font-family:'Oswald','Arial Narrow',sans-serif;font-weight:600;font-size:15px;
   margin:0 0 6px;letter-spacing:.04em;text-transform:uppercase;}
 .dl-access p{font-size:12.5px;color:var(--steel);line-height:1.6;margin:0 0 12px;font-weight:500;}
@@ -5856,7 +6128,7 @@ const css = `
 .dl-alertbtn.critical{border-color:var(--over);color:#fff;background:var(--over);}
 .dl-alertbtn em{font-style:normal;background:rgba(255,255,255,.25);border-radius:9px;padding:1px 7px;
   font-family:ui-monospace,monospace;font-size:11px;}
-.dl-alertbtn.warn em{background:rgba(184,119,8,.18);}
+.dl-alertbtn.warn em{background:rgba(138,78,11,.18);}
 .dl-bell{width:9px;height:9px;border-radius:50%;background:currentColor;flex-shrink:0;}
 .dl-alertbtn.critical .dl-bell{animation:dlPulse 1.6s ease-in-out infinite;}
 @keyframes dlPulse{0%,100%{opacity:1;}50%{opacity:.35;}}
@@ -5873,11 +6145,11 @@ const css = `
 .dl-alertfilter{margin-bottom:14px;}
 .dl-alerts{display:flex;flex-direction:column;gap:8px;}
 .dl-alert{display:flex;gap:13px;align-items:flex-start;cursor:pointer;padding:11px 13px;
-  border:1px solid var(--rule);border-left:5px solid var(--mute);background:#F7F9FB;}
-.dl-alert:hover{background:#EEF3F8;}
+  border:1px solid var(--rule);border-left:5px solid var(--mute);background:#F5F8F5;}
+.dl-alert:hover{background:#EBF2ED;}
 .dl-alert.critical{border-left-color:var(--over);background:#FBEFEC;}
 .dl-alert.warn{border-left-color:var(--watch);background:#FCF4E2;}
-.dl-alert.info{border-left-color:#5C7C99;}
+.dl-alert.info{border-left-color:#5C8F7E;}
 .dl-alevel{font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;font-weight:700;
   white-space:nowrap;padding-top:3px;width:96px;flex-shrink:0;color:var(--steel);}
 .dl-alert.critical .dl-alevel{color:var(--over);}
@@ -5905,7 +6177,7 @@ const css = `
 /* transfer */
 .dl-xfer{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;}
 .dl-xfer section{border:1px solid var(--rule);border-top:3px solid var(--ink);border-radius:var(--r-sm);
-  background:#F7F9FB;padding:14px;}
+  background:#F5F8F5;padding:14px;}
 .dl-xfer h4{font-family:'Oswald','Arial Narrow',sans-serif;font-weight:600;font-size:15px;margin:0 0 6px;
   letter-spacing:.04em;text-transform:uppercase;}
 .dl-xfer p{font-size:12.5px;color:var(--steel);line-height:1.6;margin:0 0 12px;font-weight:500;}
@@ -5916,12 +6188,12 @@ const css = `
 
 /* master sheet */
 .dl-filters{display:flex;flex-wrap:wrap;gap:13px;align-items:flex-end;margin-bottom:20px;
-  padding:15px 16px;background:#EFF3F7;border:1px solid var(--rule);border-radius:var(--r);}
+  padding:15px 16px;background:#ECF2ED;border:1px solid var(--rule);border-radius:var(--r);}
 .dl-filters .dl-field input{min-width:200px;}
 .dl-check{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--steel);font-weight:600;
   padding-bottom:7px;cursor:pointer;}
 .dl-check input{width:16px;height:16px;accent-color:var(--amber-dk);}
-.dl-master .dl-mini{font-size:12.5px;font-weight:500;padding:4px 6px;border:1px solid #93A5B8;border-radius:3px;
+.dl-master .dl-mini{font-size:12.5px;font-weight:500;padding:4px 6px;border:1px solid #8FA79B;border-radius:3px;
   background:var(--card);font-family:inherit;}
 .dl-norminput{width:88px;text-align:right;font-family:ui-monospace,monospace;font-size:13px;
   padding:6px 8px;border:1px solid var(--amber-dk);background:#FFF8EA;border-radius:3px;font-weight:700;}
@@ -5929,7 +6201,7 @@ const css = `
 
 /* drill-down */
 .dl-kpi.tap{cursor:pointer;}
-.dl-kpi.tap:hover{background:#EEF3F8;border-color:var(--steel);box-shadow:var(--sh-2);}
+.dl-kpi.tap:hover{background:#EBF2ED;border-color:var(--steel);box-shadow:var(--sh-2);}
 .dl-kpimore{display:block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
   color:var(--amber-dk);font-weight:700;margin-top:6px;}
 .dl-modal.wide{max-width:960px;}
@@ -5985,14 +6257,14 @@ const css = `
 
 /* modal */
 .dl-scrim{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
-  padding:24px;background:rgba(9,17,28,.6);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
+  padding:24px;background:rgba(7,20,17,.6);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
   animation:dlFade .16s ease-out;}
 @keyframes dlFade{from{opacity:0;}to{opacity:1;}}
 @keyframes dlRise{from{opacity:0;transform:translateY(14px) scale(.985);}to{opacity:1;transform:none;}}
 
 .dl-modal{position:relative;display:flex;flex-direction:column;width:100%;max-width:460px;
   max-height:88vh;background:var(--card);border-radius:5px;overflow:hidden;
-  box-shadow:0 1px 2px rgba(9,17,28,.2),0 18px 48px -12px rgba(9,17,28,.5);
+  box-shadow:0 1px 2px rgba(7,20,17,.2),0 18px 48px -12px rgba(7,20,17,.5);
   animation:dlRise .2s cubic-bezier(.2,.7,.3,1);}
 .dl-modal.wide{max-width:980px;}
 .dl-modal::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;
@@ -6016,7 +6288,7 @@ const css = `
 .dl-note{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:60;
   display:flex;align-items:center;gap:9px;background:var(--ink);color:#fff;
   padding:12px 18px 12px 15px;border-radius:4px;font-size:13.5px;font-weight:500;letter-spacing:.01em;
-  border-left:4px solid var(--amber);box-shadow:0 10px 28px -8px rgba(9,17,28,.55);
+  border-left:4px solid var(--amber);box-shadow:0 10px 28px -8px rgba(7,20,17,.55);
   animation:dlToast .22s cubic-bezier(.2,.7,.3,1);}
 @keyframes dlToast{from{opacity:0;transform:translate(-50%,10px);}to{opacity:1;transform:translate(-50%,0);}}
 
