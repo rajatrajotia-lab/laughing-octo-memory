@@ -59,7 +59,12 @@ function createHub(appDir, dataFile) {
       'text-align:center;">Other devices on this WiFi can open: <b>' + urls + "</b>" +
       '<span onclick="document.getElementById(\'lanshare\').remove()" ' +
       'style="position:absolute;right:10px;top:5px;cursor:pointer;font-size:15px;">&times;</span></div>';
-    return indexRaw.replace("</body>", banner + "</body>");
+    /* Insert at the LAST </body>: the bundled spreadsheet library contains
+       the same text inside a script string, and replacing the first match
+       corrupts it. */
+    const at = indexRaw.lastIndexOf("</body>");
+    if (at < 0) return indexRaw;
+    return indexRaw.slice(0, at) + banner + indexRaw.slice(at);
   }
 
   function json(res, code, obj) {
