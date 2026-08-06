@@ -1546,6 +1546,27 @@ function DieselLogbook() {
     setSiteId(data.sites.find(s => s.id !== id)?.id || null);
     setMachineId(null);
   };
+  const syncStockIssue = (d, siteId, m, date) => {
+    const f = fuelOf(m);
+    const list = d.stock[siteId] || (d.stock[siteId] = []);
+    const total = (d.logs[m.id] || []).filter(l => l.date === date && !isDirect(l)).reduce((a, l) => a + num(l.litres), 0);
+    let day = list.find(x => x.date === date && (x.fuel || "HSD") === f);
+    if (!day && total <= 0) return;
+    if (!day) {
+      day = {
+        ...blankStock(f),
+        id: uid(),
+        date,
+        fuel: f,
+        opening: ""
+      };
+      list.push(day);
+    }
+    day.issues = day.issues || {};
+    if (total > 0) day.issues[m.id] = +total.toFixed(2);else delete day.issues[m.id];
+    const empty = (day.receipts || []).length === 0 && Object.values(day.issues).every(q => !num(q)) && !num(day.otherQty) && (day.physical === "" || day.physical === null || day.physical === undefined) && !(day.remarks || "").trim() && String(day.opening || "").trim() === "";
+    if (empty) d.stock[siteId] = list.filter(x => x.id !== day.id);
+  };
   const saveEntry = () => {
     if (!machine) return;
     if (!form.date) return setNote("Pick a date for the entry.");
@@ -1575,6 +1596,29 @@ function DieselLogbook() {
       const later = (data.logs[machine.id] || []).filter(e => e.id !== editId && shiftKey(e) > key && e.open !== "" && e.open !== null && e.open !== undefined).sort((a, b) => shiftKey(a) < shiftKey(b) ? -1 : 1);
       if (later.length && Math.abs(num(later[0].open) - num(form.close)) > 0.001) return setNote(`The next entry (${later[0].date}) opens on ${fmt(num(later[0].open), 1)} — this closing has to match it, or edit that entry first.`);
     }
+    if (!isDirect(form) && num(form.litres) > 0) {
+      const f = fuelOf(machine);
+      const hasRegister = (data.stock[site.id] || []).some(x => (x.fuel || "HSD") === f);
+      if (!hasRegister) return setNote(`No ${f} stock is recorded at this site yet. Enter the opening stock or the day's receipt on the Fuel stock page first — fuel cannot be issued from an empty register.`);
+      const trial = JSON.parse(JSON.stringify(data.stock[site.id]));
+      let day = trial.find(x => x.date === form.date && (x.fuel || "HSD") === f);
+      if (!day) {
+        day = {
+          ...blankStock(f),
+          id: "__trial__",
+          date: form.date,
+          fuel: f,
+          opening: ""
+        };
+        trial.push(day);
+      }
+      day.issues = day.issues || {};
+      day.issues[machine.id] = (data.logs[machine.id] || []).filter(l => l.date === form.date && !isDirect(l) && l.id !== editId).reduce((a, l) => a + num(l.litres), 0) + num(form.litres);
+      const chain = buildStock(trial, fleet, f).slice().reverse();
+      const short = chain.find(r => r.closing < -0.001);
+      if (short) return setNote(`Not enough ${f} in stock: on ${short.e.date} only ${fmt(Math.max(0, short.total - (short.issued - num(form.litres))), 1)} L is available for this issue ` + `(opening ${fmt(short.opening, 1)} + received ${fmt(short.received, 1)} − other issues). Receive fuel or correct the stock register first.`);
+    }
+    const origRow = editId ? (data.logs[machine.id] || []).find(e => e.id === editId) : null;
     update(d => {
       const arr = d.logs[machine.id] || (d.logs[machine.id] = []);
       if (editId) {
@@ -1590,6 +1634,8 @@ function DieselLogbook() {
           siteId: site.id
         });
       }
+      syncStockIssue(d, site.id, machine, form.date);
+      if (origRow && origRow.date !== form.date) syncStockIssue(d, site.id, machine, origRow.date);
     });
     setNote(editId ? "Entry updated." : "Entry logged.");
     setEditId(null);
@@ -1606,6 +1652,7 @@ function DieselLogbook() {
     if (row && isLocked(data, site.id, row.date)) return setNote(`${monthLabel(row.date.slice(0, 7))} is locked for this site.`);
     update(d => {
       d.logs[machine.id] = d.logs[machine.id].filter(e => e.id !== id);
+      if (row && !isDirect(row)) syncStockIssue(d, site.id, machine, row.date);
     });
     if (editId === id) {
       setEditId(null);
@@ -1791,6 +1838,9 @@ function DieselLogbook() {
     if (isLocked(data, site.id, entry.date)) return setNote(`${monthLabel(entry.date.slice(0, 7))} is locked for this site.`);
     const existing = (data.stock[site.id] || []).find(x => x.date === entry.date && (x.fuel || "HSD") === f && x.id !== editingId);
     if (existing) return setNote(`A ${f} report already exists for ${entry.date}. Edit that one instead.`);
+    const othersF = (data.stock[site.id] || []).filter(x => (x.fuel || "HSD") === f && x.id !== editingId);
+    const isFirstReport = othersF.length === 0 || entry.date < othersF.reduce((a, x) => x.date < a ? x.date : a, "9999-99-99");
+    if (isFirstReport && String(entry.opening === undefined ? "" : entry.opening).trim() === "") return setNote(`First ${f} report for this site — enter the opening stock in litres (0 if the tank was empty). Every later day carries the previous closing forward automatically.`);
     const trial = (data.stock[site.id] || []).map(x => x.id === editingId ? {
       ...entry,
       id: x.id
