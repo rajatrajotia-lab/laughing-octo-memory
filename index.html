@@ -3184,7 +3184,38 @@ function Dashboard({
     stackId: "a",
     fill: SERIES[i % SERIES.length],
     maxBarSize: 46
-  }))))))), React.createElement("div", {
+  }))))), useSplit.length > 0 && React.createElement("div", {
+    className: "dl-chart"
+  }, React.createElement("h3", {
+    className: "dl-blockhead"
+  }, "Where the ", fuel, " goes — share by purpose"), React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 250
+  }, React.createElement(PieChart, null, React.createElement(Pie, {
+    data: useSplit,
+    dataKey: "value",
+    nameKey: "name",
+    innerRadius: 52,
+    outerRadius: 82,
+    paddingAngle: 2,
+    stroke: "#fff",
+    label: d => `${(d.percent * 100).toFixed(0)}%`
+  }, useSplit.map(u => React.createElement(Cell, {
+    key: u.name,
+    fill: {
+      "Work oriented": "#0C2B25",
+      "Ancillary": "#C86A15",
+      "Camp establishment": "#2C7A64",
+      "Not set": "#8FA79B"
+    }[u.name] || "#5C8F7E"
+  }))), React.createElement(Tooltip, {
+    ...TIP,
+    formatter: (v, n) => [`${fmt(v, 0)} L · ${pct(v, useSplit.reduce((a, b) => a + b.value, 0))}`, n]
+  }), React.createElement(Legend, {
+    wrapperStyle: LEG
+  }))), React.createElement("p", {
+    className: "dl-legend"
+  }, "Work-oriented burn earns money; ancillary and camp are overheads. A growing overhead share is the thing to catch early.")))), React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
