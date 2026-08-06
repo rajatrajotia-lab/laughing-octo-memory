@@ -3058,6 +3058,8 @@ function Dashboard({
     className: "dl-table"
   }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Date"), React.createElement("th", {
     className: "r"
+  }, "Opening stock"), React.createElement("th", {
+    className: "r"
   }, "Purchased"), React.createElement("th", {
     className: "r"
   }, "Consumed"), React.createElement("th", {
@@ -3070,6 +3072,8 @@ function Dashboard({
     className: "mono"
   }, dy.date), React.createElement("td", {
     className: "r mono"
+  }, dy.closing === null ? "—" : fmt(dy.closing - dy.received + dy.issued, 1)), React.createElement("td", {
+    className: "r mono"
   }, fmt(dy.received, 1)), React.createElement("td", {
     className: "r mono"
   }, React.createElement("strong", null, fmt(dy.issued + dy.direct, 1))), React.createElement("td", {
@@ -3078,7 +3082,7 @@ function Dashboard({
     className: "dl-sub2"
   }, Object.values(dy.sites).map(c => c.site.nick || c.site.name).join(", "))))))), React.createElement("p", {
     className: "dl-legend"
-  }, "One row per day across the whole company. Click a row for that day's site-wise and machine-wise break-up, including how much came from the site tank against direct from the pump.")), tab === "overview" && React.createElement("div", {
+  }, "Opening stock is the previous day's closing carried forward. Opening + purchased − issues from the tank = closing; fuel drawn direct from the pump counts in Consumed but never passes through the tank, so it does not move the closing stock. Click a row for the day's site-wise and machine-wise break-up.")), tab === "overview" && React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
@@ -3089,6 +3093,8 @@ function Dashboard({
   }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Site"), React.createElement("th", null, "Month"), React.createElement("th", {
     className: "r"
   }, "Days reported"), React.createElement("th", {
+    className: "r"
+  }, "Opening stock"), React.createElement("th", {
     className: "r"
   }, "Purchased"), React.createElement("th", {
     className: "r"
@@ -3140,6 +3146,8 @@ function Dashboard({
         className: "r mono"
       }, d || "—"), React.createElement("td", {
         className: "r mono"
+      }, c === null || c === undefined ? "—" : fmt(c - (pd.received || 0) + (pd.issued || 0), 1)), React.createElement("td", {
+        className: "r mono"
       }, fmt(pd.received || 0, 1)), React.createElement("td", {
         className: "r mono"
       }, React.createElement("strong", null, fmt(pd.issued || 0, 1))), React.createElement("td", {
@@ -3159,6 +3167,8 @@ function Dashboard({
   })), month !== "all" && React.createElement("tfoot", null, React.createElement("tr", null, React.createElement("td", {
     colSpan: 3
   }, "All sites — ", monthLabel(month)), React.createElement("td", {
+    className: "r mono"
+  }, fmt(inHand - purchased + issuedStock, 1)), React.createElement("td", {
     className: "r mono"
   }, fmt(purchased, 1)), React.createElement("td", {
     className: "r mono"
