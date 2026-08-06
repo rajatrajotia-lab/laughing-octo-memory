@@ -3544,13 +3544,38 @@ function DrillDown({
     }, "₹ ", fmt(total, 0))))));
   }
   if (which === "over") {
-    body = overStd.length === 0 ? React.createElement("p", {
+    const bySite = {};
+    overStd.forEach(r => {
+      if (r.variance === null || !isFinite(r.variance)) return;
+      const ex = r.litres * (r.variance / (100 + r.variance));
+      const g = bySite[r.site.id] || (bySite[r.site.id] = {
+        site: r.site,
+        excess: 0,
+        rows: []
+      });
+      g.excess += ex;
+      g.rows.push({
+        r,
+        ex
+      });
+    });
+    const groups = Object.values(bySite).sort((a, b) => b.excess - a.excess);
+    const totalEx = groups.reduce((a, g) => a + g.excess, 0);
+    body = groups.length === 0 ? React.createElement("p", {
       className: "dl-hint"
-    }, "No machine is above its standard in this period. Machines without a standard set are not assessed.") : React.createElement("div", {
+    }, "No machine is above its standard in this period. Machines without a standard set are not assessed.") : React.createElement(React.Fragment, null, groups.map(g => React.createElement("div", {
+      key: g.site.id,
+      className: "dl-block",
+      style: {
+        marginTop: 0
+      }
+    }, React.createElement("h4", {
+      className: "dl-drillsite"
+    }, g.site.name, React.createElement("span", null, fmt(g.excess, 1), " L excess · ", g.rows.length, " machine", g.rows.length === 1 ? "" : "s", groups.length > 1 ? ` · ${pct(g.excess, totalEx)} of company excess` : "")), React.createElement("div", {
       className: "dl-tablewrap"
     }, React.createElement("table", {
       className: "dl-table"
-    }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Machine"), React.createElement("th", null, "Site"), React.createElement("th", {
+    }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Machine"), React.createElement("th", {
       className: "r"
     }, "Actual"), React.createElement("th", {
       className: "r"
@@ -3558,31 +3583,33 @@ function DrillDown({
       className: "r"
     }, "Variance"), React.createElement("th", {
       className: "r"
-    }, "Excess"))), React.createElement("tbody", null, overStd.slice().sort((a, b) => b.variance - a.variance).map(r => {
-      const ex = r.litres * (r.variance / (100 + r.variance));
-      return React.createElement("tr", {
-        key: (r.site ? r.site.id + ":" : "") + r.m.id,
-        className: "click",
-        onClick: () => {
-          onOpen(r.site.id, r.m.id);
-          onClose();
-        }
-      }, React.createElement("td", null, React.createElement("strong", null, r.m.name), React.createElement("span", {
-        className: "dl-sub"
-      }, r.m.category)), React.createElement("td", {
-        className: "dl-sub2"
-      }, r.site.name), React.createElement("td", {
-        className: "r mono"
-      }, fmt(r.eff), " ", React.createElement("span", {
-        className: "dl-u"
-      }, r.m.meterType === "hours" ? "L/hr" : "km/L")), React.createElement("td", {
-        className: "r mono"
-      }, r.m.norm), React.createElement("td", {
-        className: "r mono flag over"
-      }, "+", fmt(r.variance, 1), "%"), React.createElement("td", {
-        className: "r mono"
-      }, fmt(ex, 1), " L"));
-    }))));
+    }, "Excess"), React.createElement("th", {
+      className: "r"
+    }, "Share of site excess"))), React.createElement("tbody", null, g.rows.sort((a, b) => b.ex - a.ex).map(({
+      r,
+      ex
+    }) => React.createElement("tr", {
+      key: r.m.id,
+      className: "click",
+      onClick: () => {
+        onOpen(r.site.id, r.m.id);
+        onClose();
+      }
+    }, React.createElement("td", null, React.createElement("strong", null, r.m.name), React.createElement("span", {
+      className: "dl-sub"
+    }, r.m.category)), React.createElement("td", {
+      className: "r mono"
+    }, fmt(r.eff), " ", React.createElement("span", {
+      className: "dl-u"
+    }, r.m.meterType === "hours" ? "L/hr" : "km/L")), React.createElement("td", {
+      className: "r mono"
+    }, r.m.norm), React.createElement("td", {
+      className: "r mono flag over"
+    }, "+", fmt(r.variance, 1), "%"), React.createElement("td", {
+      className: "r mono"
+    }, React.createElement("strong", null, fmt(ex, 1), " L")), React.createElement("td", {
+      className: "r mono"
+    }, pct(ex, g.excess))))))))));
   }
   return React.createElement(Modal, {
     title: titles[which],
