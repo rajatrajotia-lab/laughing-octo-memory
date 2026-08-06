@@ -2821,6 +2821,21 @@ function Dashboard({
   const plantTotal = plantRows.reduce((a, x) => a + x.cost, 0);
   const plantHired = plantRows.filter(x => x.r.own === "Hired").length;
   const plantOwn = plantRows.length - plantHired;
+  const hiredTotal = plantRows.filter(x => x.r.own === "Hired").reduce((a, x) => a + x.cost, 0);
+  const ownTotal = plantTotal - hiredTotal;
+  const plantBySite = overview.map(s => {
+    let h = 0,
+      o = 0;
+    s.rows.forEach(r => {
+      if (!s.site.machines.some(m => m.id === r.m.id)) return;
+      if (r.own === "Hired") h += r.rent;else o += num(r.m.ownCost);
+    });
+    return {
+      name: s.site.nick || s.site.name,
+      Hired: Math.round(h),
+      Own: Math.round(o)
+    };
+  }).filter(x => x.Hired > 0 || x.Own > 0);
   const useSplit = USAGE.map(u => {
     const rs = allRows.filter(r => r.usage === u);
     return {
@@ -2922,11 +2937,6 @@ function Dashboard({
     value: fmt(inHand, 0),
     unit: `litres across ${sites.filter(x => (x.st.closing || 0) > 0).length} site(s)`,
     onClick: () => setDrill("stock")
-  }), React.createElement(Kpi, {
-    label: "Plant cost",
-    value: "₹ " + fmt(plantTotal, 0),
-    unit: `per month · ${plantHired} hired + ${plantOwn} own`,
-    onClick: () => setDrill("rent")
   }), React.createElement(Kpi, {
     label: "Above standard",
     value: overStd.length,
@@ -3221,6 +3231,74 @@ function Dashboard({
   }))), React.createElement("p", {
     className: "dl-legend"
   }, "Work-oriented burn earns money; ancillary and camp are overheads. A growing overhead share is the thing to catch early.")))), React.createElement("div", {
+    className: "dl-block"
+  }, React.createElement("h3", {
+    className: "dl-blockhead"
+  }, "Plant cost — monthly commitment"), React.createElement("div", {
+    className: "dl-kpis"
+  }, React.createElement(Kpi, {
+    label: "Hired machines",
+    value: "₹ " + fmt(hiredTotal, 0),
+    unit: `per month · ${plantHired} machine${plantHired === 1 ? "" : "s"}`,
+    onClick: () => setDrill("rent")
+  }), React.createElement(Kpi, {
+    label: "Own machines",
+    value: "₹ " + fmt(ownTotal, 0),
+    unit: `per month · ${plantOwn} machine${plantOwn === 1 ? "" : "s"} costed`,
+    onClick: () => setDrill("rent")
+  }), React.createElement(Kpi, {
+    label: "Total plant cost",
+    value: "₹ " + fmt(plantTotal, 0),
+    unit: "per month · click for site-wise detail",
+    onClick: () => setDrill("rent")
+  })), plantBySite.length > 0 && React.createElement("div", {
+    className: "dl-chart",
+    style: {
+      marginTop: 14
+    }
+  }, React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 230
+  }, React.createElement(BarChart, {
+    data: plantBySite,
+    margin: {
+      top: 8,
+      right: 8,
+      left: 8,
+      bottom: 0
+    }
+  }, React.createElement(CartesianGrid, {
+    stroke: "#D3E0D7",
+    vertical: false
+  }), React.createElement(XAxis, {
+    dataKey: "name",
+    tick: AX,
+    axisLine: AXL,
+    tickLine: false
+  }), React.createElement(YAxis, {
+    tick: AX,
+    axisLine: AXL,
+    tickLine: false,
+    width: 74,
+    tickFormatter: v => "₹" + (v >= 100000 ? (v / 100000).toFixed(1) + "L" : fmt(v, 0))
+  }), React.createElement(Tooltip, {
+    ...TIP,
+    formatter: (v, n) => ["₹ " + fmt(v, 0) + " / month", n]
+  }), React.createElement(Legend, {
+    wrapperStyle: LEG
+  }), React.createElement(Bar, {
+    dataKey: "Hired",
+    stackId: "p",
+    fill: "#C86A15",
+    maxBarSize: 60
+  }), React.createElement(Bar, {
+    dataKey: "Own",
+    stackId: "p",
+    fill: "#0C2B25",
+    maxBarSize: 60
+  })))), React.createElement("p", {
+    className: "dl-legend"
+  }, "Kept apart from the fuel figures above. Hired is the committed hire per month at current rates; Own is the owning cost entered against own machines. Click any card for the site-wise and machine-wise break-up.")), React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
