@@ -1,7 +1,7 @@
 {
   "name": "fuel-register",
-  "productName": "Fuel Register",
-  "version": "1.2.13",
+  "productName": "HSD-REGISTER",
+  "version": "1.3.0",
   "description": "Diesel fuel tracking: logbook, purchases, stock register and reports.",
   "author": "Rajat Rajotia",
   "license": "UNLICENSED",
@@ -16,7 +16,7 @@
   },
   "build": {
     "appId": "com.fuelregister.app",
-    "productName": "Fuel Register",
+    "productName": "HSD-REGISTER",
     "files": [
       "main.js",
       "server.js",
@@ -35,17 +35,17 @@
     "nsis": {
       "oneClick": true,
       "createDesktopShortcut": true,
-      "shortcutName": "Fuel Register",
-      "artifactName": "FuelRegister-Setup-${version}.${ext}"
+      "shortcutName": "HSD-REGISTER",
+      "artifactName": "HSD-REGISTER-Setup-${version}.${ext}"
     },
     "portable": {
-      "artifactName": "FuelRegister-Portable-${version}.${ext}"
+      "artifactName": "HSD-REGISTER-Portable-${version}.${ext}"
     },
     "mac": {
       "target": [{ "target": "zip", "arch": ["universal"] }],
       "icon": "build/icon.png",
       "category": "public.app-category.business",
-      "artifactName": "FuelRegister-Mac-${version}.${ext}"
+      "artifactName": "HSD-REGISTER-Mac-${version}.${ext}"
     }
   }
 }

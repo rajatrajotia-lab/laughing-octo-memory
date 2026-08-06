@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application
-        android:label="Fuel Register"
+        android:label="HSD-REGISTER"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="true"
         android:theme="@android:style/Theme.Light.NoTitleBar">

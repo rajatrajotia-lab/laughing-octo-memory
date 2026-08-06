@@ -31,8 +31,8 @@ jobs:
         with:
           name: windows
           path: |
-            desktop/dist/FuelRegister-Setup-*.exe
-            desktop/dist/FuelRegister-Portable-*.exe
+            desktop/dist/HSD-REGISTER-Setup-*.exe
+            desktop/dist/HSD-REGISTER-Portable-*.exe
 
   mac:
     runs-on: macos-latest
@@ -56,16 +56,16 @@ jobs:
       - name: Ad-hoc sign so Gatekeeper allows right-click open
         working-directory: desktop/dist
         run: |
-          ZIP=$(ls FuelRegister-Mac-*.zip)
+          ZIP=$(ls HSD-REGISTER-Mac-*.zip)
           ditto -x -k "$ZIP" unpacked
-          codesign --force --deep -s - "unpacked/Fuel Register.app"
-          codesign --verify --deep "unpacked/Fuel Register.app"
+          codesign --force --deep -s - "unpacked/HSD-REGISTER.app"
+          codesign --verify --deep "unpacked/HSD-REGISTER.app"
           rm "$ZIP"
-          ditto -c -k --keepParent "unpacked/Fuel Register.app" "$ZIP"
+          ditto -c -k --keepParent "unpacked/HSD-REGISTER.app" "$ZIP"
       - uses: actions/upload-artifact@v4
         with:
           name: mac
-          path: desktop/dist/FuelRegister-Mac-*.zip
+          path: desktop/dist/HSD-REGISTER-Mac-*.zip
 
   android:
     runs-on: ubuntu-latest
@@ -89,11 +89,11 @@ jobs:
             android/app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
           "$ANDROID_HOME/build-tools/$BT/apksigner" sign \
             --ks android/signing.p12 --ks-pass pass:fuelregister \
-            --out "FuelRegister-$VERSION.apk" aligned.apk
+            --out "HSD-REGISTER-$VERSION.apk" aligned.apk
       - uses: actions/upload-artifact@v4
         with:
           name: android
-          path: FuelRegister-*.apk
+          path: HSD-REGISTER-*.apk
 
   release:
     needs: [windows, mac, android]
@@ -111,7 +111,7 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.v.outputs.version }}
-          name: Fuel Register ${{ steps.v.outputs.version }}
+          name: HSD-REGISTER ${{ steps.v.outputs.version }}
           body: |
             ## Easiest install — no security warnings (recommended for office PCs)
             Open **https://rajatrajotia-lab.github.io/laughing-octo-memory/** in Chrome or Edge
@@ -124,20 +124,20 @@ jobs:
             These are not from a registered software publisher, so Windows and macOS show
             warnings the first time. That is expected — follow the steps below once.
 
-            **Windows** — `FuelRegister-Setup-${{ steps.v.outputs.version }}.exe`
+            **Windows** — `HSD-REGISTER-Setup-${{ steps.v.outputs.version }}.exe`
             1. Double-click the file. If a blue "Windows protected your PC" screen appears,
                click **More info**, then **Run anyway**.
             2. If nothing happens at all, your office antivirus has quarantined it — use the
                browser install at the top instead (it cannot be blocked this way).
 
-            **Mac** — `FuelRegister-Mac-${{ steps.v.outputs.version }}.zip`
-            1. Double-click the zip, then drag **Fuel Register** into **Applications**.
+            **Mac** — `HSD-REGISTER-Mac-${{ steps.v.outputs.version }}.zip`
+            1. Double-click the zip, then drag **HSD-REGISTER** into **Applications**.
             2. First launch only: **right-click (or Control-click) the app → Open → Open**.
                A plain double-click will be refused the first time — that is normal.
             3. If macOS still refuses, open Terminal and paste:
-               `xattr -cr "/Applications/Fuel Register.app"` then open it again.
+               `xattr -cr "/Applications/HSD-REGISTER.app"` then open it again.
 
-            **Android** — `FuelRegister-${{ steps.v.outputs.version }}.apk`
+            **Android** — `HSD-REGISTER-${{ steps.v.outputs.version }}.apk`
             Open the file on the phone and allow "install from unknown sources" when asked.
             Installs over older versions; your entries are kept.
 

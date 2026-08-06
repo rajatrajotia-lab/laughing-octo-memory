@@ -51,7 +51,18 @@ async function migrateOldEntries(hub) {
 
 app.whenReady().then(async () => {
   try {
-    const hub = createHub(APP_DIR, path.join(app.getPath("userData"), "shared-data.json"));
+    /* The app used to be called "Fuel Register"; adopt its data folder
+       so existing installs keep their records under the new name. */
+    const fs = require("fs");
+    const dataFile = path.join(app.getPath("userData"), "shared-data.json");
+    const oldFile = path.join(path.dirname(app.getPath("userData")), "Fuel Register", "shared-data.json");
+    try {
+      if (!fs.existsSync(dataFile) && fs.existsSync(oldFile)) {
+        fs.mkdirSync(path.dirname(dataFile), { recursive: true });
+        fs.copyFileSync(oldFile, dataFile);
+      }
+    } catch (e) { /* fresh install */ }
+    const hub = createHub(APP_DIR, dataFile);
     hubPort = await hub.listen([8785, 8786, 8787, 8788, 8789]);
     await migrateOldEntries(hub);
   } catch (e) {
