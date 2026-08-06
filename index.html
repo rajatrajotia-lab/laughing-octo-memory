@@ -466,10 +466,16 @@ const parseClock = t => {
   return h + mi / 60;
 };
 const shiftKey = e => `${e.date || ""}#${shiftOf(e) === "Night" ? 1 : 0}`;
-function previousClose(logs, date, shift, exceptId) {
-  const key = `${date}#${shift === "Night" ? 1 : 0}`;
-  const before = (logs || []).filter(e => e.id !== exceptId && e.close !== "" && e.close !== null && e.close !== undefined).filter(e => shiftKey(e) < key).sort((a, b) => shiftKey(a) < shiftKey(b) ? 1 : -1);
-  return before.length ? num(before[0].close) : null;
+function previousClose(logs, date, exceptId) {
+  let best = null;
+  (logs || []).forEach(e => {
+    if (e.id === exceptId) return;
+    if (e.close === "" || e.close === null || e.close === undefined) return;
+    if ((e.date || "") > date) return;
+    const c = num(e.close);
+    if (best === null || c > best) best = c;
+  });
+  return best;
 }
 const availability = (run, down) => run + down > 0 ? run / (run + down) * 100 : null;
 const SOURCES = ["Site tank", "Direct from pump"];
@@ -765,10 +771,8 @@ function buildAlerts(data) {
       });
       Object.keys(byDate).forEach(d => {
         const set = byDate[d];
-        const dayN = set.filter(e => shiftOf(e) === "Day").length;
-        const nightN = set.filter(e => shiftOf(e) === "Night").length;
-        const fullN = set.filter(e => shiftOf(e) === "Full").length;
-        if (dayN > 1 || nightN > 1 || fullN > 1 || fullN >= 1 && set.length > 1 || set.length > SHIFTS.length) {
+        const totalUsed = set.reduce((a, e) => a + calcRow(e, m).run + downHoursOf(e), 0);
+        if (m.meterType !== "km" && totalUsed > 24.01) {
           const hrs = set.reduce((a, e) => a + calcRow(e, m).run, 0);
           push({
             level: "critical",
@@ -777,8 +781,8 @@ function buildAlerts(data) {
             machine: m,
             fuel: fuelOf(m),
             date: d,
-            title: "Same shift entered twice",
-            detail: `${m.name} on ${d}: ${dayN} day and ${nightN} night entr${dayN + nightN === 1 ? "y" : "ies"}, totalling ${fmt(hrs, 1)} ${m.meterType !== "km" ? "hours" : "km"}. ` + `A day takes one day shift and one night shift — delete the extra.`
+            title: "More than 24 hours in one day",
+            detail: `${m.name} on ${d}: ${set.length} entr${set.length === 1 ? "y" : "ies"} totalling ${fmt(totalUsed, 1)} hours run and down — more than a day holds. Check the readings.` + `A day takes one day shift and one night shift — delete the extra.`
           });
         }
         if (m.meterType !== "km") {
@@ -1259,7 +1263,8 @@ function DieselLogbook() {
   }, [data]);
   const inMonth = e => month === "all" || (e.date || "").slice(0, 7) === month;
   const log = useMemo(() => rawLog.filter(inMonth).slice().sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0), [rawLog, month]);
-  const carried = useMemo(() => machine && form.date && !isClock(machine) ? previousClose(data.logs[machine.id] || [], form.date, shiftOf(form), editId) : null, [machine, data.logs, form.date, form.shift, editId]);
+  const carried = useMemo(() => machine && form.date && !isClock(machine) ? previousClose(data.logs[machine.id] || [], form.date, editId) : null, [machine, data.logs, form.date, form.shift, editId]);
+  const sameDaySiblings = useMemo(() => machine && form.date ? (data.logs[machine.id] || []).some(e => e.date === form.date && e.id !== editId) : false, [machine, data.logs, form.date, editId]);
   useEffect(() => {
     if (carried === null) return;
     const want = String(carried);
@@ -1592,32 +1597,23 @@ function DieselLogbook() {
     if (!machine) return;
     if (!form.date) return setNote("Pick a date for the entry.");
     if (isLocked(data, site.id, form.date)) return setNote(`${monthLabel(form.date.slice(0, 7))} is locked for this site.`);
-    const sh = shiftOf(form);
     const sameDay = (data.logs[machine.id] || []).filter(e => e.date === form.date && e.id !== editId);
-    if (sameDay.length > 0) return setNote(`${machine.name} already has an entry for ${form.date} — one entry covers the whole day. Edit the existing entry instead.`);
-    const clash = sameDay.find(e => shiftOf(e) === sh);
-    if (clash) return setNote(`${machine.name} already has a ${sh.toLowerCase()} shift entry for ${form.date}` + `${clash.origin === "stock" ? ", raised from that day's fuel report" : ""}. ` + `Edit it rather than adding another.`);
-    if (sameDay.length >= SHIFTS.length) return setNote(`${machine.name} already has both shifts entered for ${form.date}. A day takes two entries at most.`);
-    if (carried !== null && Math.abs(num(form.open) - carried) > 0.001) return setNote(`The previous entry closed on ${fmt(carried, 1)}. ` + `The opening reading has to match it.`);
+    if (sameDay.length === 0 && carried !== null && Math.abs(num(form.open) - carried) > 0.001) return setNote(`The previous entry closed on ${fmt(carried, 1)}. ` + `The opening reading has to match it.`);
     const dwn = num(form.downHours);
-    const hourCap = capOf(sh);
     if (machine.meterType !== "km") {
       const ran = calcRow(form, machine).run;
-      if (ran > hourCap) return setNote(`${fmt(ran, 1)} hours in one entry — ${sh === "Full" ? "a day holds 24" : `a shift holds ${SHIFT_HOURS}`}. Check the readings.`);
-      if (ran + dwn > hourCap) return setNote(`${fmt(ran, 1)} hours run plus ${fmt(dwn, 1)} down is ${fmt(ran + dwn, 1)} — more than the ${hourCap} hours this entry covers.`);
+      const others = sameDay.reduce((a, e) => a + calcRow(e, machine).run + downHoursOf(e), 0);
+      if (ran + dwn > 24.01) return setNote(`${fmt(ran + dwn, 1)} hours in one entry — a day holds 24. Check the readings.`);
+      if (others + ran + dwn > 24.01) return setNote(`With the other entr${sameDay.length === 1 ? "y" : "ies"} for ${form.date}, this makes ${fmt(others + ran + dwn, 1)} hours — a day holds 24.`);
     }
-    if (dwn > hourCap) return setNote(`${fmt(dwn, 1)} hours down is more than the ${hourCap} hours this entry covers.`);
+    if (dwn > 24) return setNote(`${fmt(dwn, 1)} hours down is more than the 24 hours in a day.`);
     if (num(form.litres) < 0) return setNote("Fuel issued cannot be negative.");
     if (num(form.litres) === 0 && calcRow(form, machine).run <= 0 && num(form.downHours) <= 0) return setNote("Nothing to record — enter a closing reading, fuel issued, or down time.");
     const hasClose = form.close !== "" && form.close !== null && form.close !== undefined;
     if (hasClose && !isClock(machine) && num(form.close) < num(form.open)) return setNote("Closing reading is lower than opening.");
     if (hasClose && !isClock(machine)) {
-      const key = shiftKey({
-        date: form.date,
-        shift: sh
-      });
-      const later = (data.logs[machine.id] || []).filter(e => e.id !== editId && shiftKey(e) > key && e.open !== "" && e.open !== null && e.open !== undefined).sort((a, b) => shiftKey(a) < shiftKey(b) ? -1 : 1);
-      if (later.length && Math.abs(num(later[0].open) - num(form.close)) > 0.001) return setNote(`The next entry (${later[0].date}) opens on ${fmt(num(later[0].open), 1)} — this closing has to match it, or edit that entry first.`);
+      const later = (data.logs[machine.id] || []).filter(e => e.id !== editId && (e.date || "") > form.date && e.open !== "" && e.open !== null && e.open !== undefined).sort((a, b) => a.date < b.date ? -1 : 1);
+      if (later.length && num(later[0].open) < num(form.close) - 0.001) return setNote(`The next entry (${later[0].date}) opens on ${fmt(num(later[0].open), 1)} — below this closing reading. Check the readings.`);
     }
     if (!isDirect(form) && num(form.litres) > 0) {
       const f = fuelOf(machine);
@@ -2454,8 +2450,8 @@ function DieselLogbook() {
   }, React.createElement("input", {
     type: "number",
     value: form.open,
-    disabled: carried !== null,
-    title: carried !== null ? "The previous entry closed on this reading, so it cannot be typed over" : "",
+    disabled: carried !== null && !sameDaySiblings,
+    title: carried !== null && !sameDaySiblings ? "The previous entry closed on this reading, so it cannot be typed over" : "",
     onChange: e => setForm({
       ...form,
       open: e.target.value
