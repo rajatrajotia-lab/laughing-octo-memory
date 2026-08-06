@@ -2050,6 +2050,7 @@ function DieselLogbook() {
   }) : view === "dash" ? React.createElement(Dashboard, {
     alerts: alerts,
     onAlerts: () => setDialog("alerts"),
+    data: data,
     overview: overview,
     rates: rates,
     month: month,
@@ -2690,6 +2691,7 @@ const TIP = {
 };
 const pct = (v, total) => total > 0 ? (v / total * 100).toFixed(1) + "%" : "—";
 function Dashboard({
+  data,
   overview,
   rates,
   month,
@@ -2702,6 +2704,7 @@ function Dashboard({
   const [sortBy, setSortBy] = useState("variance");
   const [fuel, setFuel] = useState("HSD");
   const [drill, setDrill] = useState(null);
+  const [dayDrill, setDayDrill] = useState(null);
   const sites = overview.map(s => {
     const rows = s.rows.filter(r => r.fuel === fuel);
     const st = s.fuelStock && s.fuelStock[fuel] || {};
@@ -2725,6 +2728,70 @@ function Dashboard({
     rows: [],
     keys: []
   };
+  const daily = useMemo(() => {
+    const days = {};
+    const mOk = dt => month === "all" || (dt || "").slice(0, 7) === month;
+    const dayOf = dt => days[dt] || (days[dt] = {
+      date: dt,
+      received: 0,
+      issued: 0,
+      direct: 0,
+      sites: {}
+    });
+    const cellOf = (o, s) => o.sites[s.id] || (o.sites[s.id] = {
+      site: s,
+      received: 0,
+      issued: 0,
+      direct: 0,
+      opening: null,
+      closing: null,
+      issues: [],
+      directRows: []
+    });
+    data.sites.forEach(s => {
+      buildStock(data.stock[s.id] || [], siteFleet(data, s), fuel).forEach(r => {
+        if (!mOk(r.e.date)) return;
+        const o = dayOf(r.e.date);
+        const c = cellOf(o, s);
+        c.received += r.received;
+        c.issued += r.issued;
+        c.opening = r.opening;
+        c.closing = r.closing;
+        c.issues = r.issues.map(x => ({
+          name: x.m.name,
+          id: x.m.id,
+          qty: x.qty
+        })).concat(num(r.otherQty) > 0 ? [{
+          name: r.e.otherLabel || "Other issue",
+          id: null,
+          qty: num(r.otherQty)
+        }] : []);
+        o.received += r.received;
+        o.issued += r.issued;
+      });
+      s.machines.forEach(m => {
+        if (fuelOf(m) !== fuel) return;
+        (data.logs[m.id] || []).forEach(e => {
+          if (!mOk(e.date) || !isDirect(e) || num(e.litres) <= 0) return;
+          const o = dayOf(e.date);
+          const c = cellOf(o, s);
+          c.direct += num(e.litres);
+          c.directRows.push({
+            name: m.name,
+            id: m.id,
+            qty: num(e.litres)
+          });
+          o.direct += num(e.litres);
+        });
+      });
+    });
+    const rows = Object.values(days).sort((a, b) => a.date < b.date ? 1 : -1);
+    rows.forEach(o => {
+      const cls = Object.values(o.sites).filter(c => c.closing !== null);
+      o.closing = cls.length ? cls.reduce((a, c) => a + c.closing, 0) : null;
+    });
+    return month === "all" ? rows.slice(0, 31) : rows;
+  }, [data, month, fuel]);
   const machineCount = new Set(allRows.map(r => r.m.id)).size;
   const purchased = sites.reduce((a, b) => a + (b.st.received || 0), 0);
   const purchaseValue = sites.reduce((a, b) => a + (b.st.value || 0), 0);
@@ -2870,6 +2937,46 @@ function Dashboard({
   })), React.createElement("p", {
     className: "dl-legend"
   }, "Every figure above opens its detail — click a card. ", entries, " entries in this period."), React.createElement("div", {
+    className: "dl-block"
+  }, React.createElement("h3", {
+    className: "dl-blockhead"
+  }, "Daily snapshot — ", fuel, month === "all" ? " · last 31 active days" : " · " + monthLabel(month)), daily.length === 0 ? React.createElement("p", {
+    className: "dl-hint"
+  }, "No activity in this period yet.") : React.createElement("div", {
+    className: "dl-tablewrap"
+  }, React.createElement("table", {
+    className: "dl-table"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Date"), React.createElement("th", {
+    className: "r"
+  }, "Purchased"), React.createElement("th", {
+    className: "r"
+  }, "Issued from tank"), React.createElement("th", {
+    className: "r"
+  }, "Direct from pump"), React.createElement("th", {
+    className: "r"
+  }, "Total consumed"), React.createElement("th", {
+    className: "r"
+  }, "Closing stock"), React.createElement("th", null, "Sites"))), React.createElement("tbody", null, daily.map(dy => React.createElement("tr", {
+    key: dy.date,
+    className: "click",
+    onClick: () => setDayDrill(dy)
+  }, React.createElement("td", {
+    className: "mono"
+  }, dy.date), React.createElement("td", {
+    className: "r mono"
+  }, fmt(dy.received, 1)), React.createElement("td", {
+    className: "r mono"
+  }, fmt(dy.issued, 1)), React.createElement("td", {
+    className: "r mono"
+  }, fmt(dy.direct, 1)), React.createElement("td", {
+    className: "r mono"
+  }, React.createElement("strong", null, fmt(dy.issued + dy.direct, 1))), React.createElement("td", {
+    className: "r mono"
+  }, dy.closing === null ? "—" : fmt(dy.closing, 1)), React.createElement("td", {
+    className: "dl-sub2"
+  }, Object.values(dy.sites).map(c => c.site.nick || c.site.name).join(", "))))))), React.createElement("p", {
+    className: "dl-legend"
+  }, "One row per day across the whole company. Click a row for that day's site-wise and machine-wise break-up.")), React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
@@ -3085,233 +3192,6 @@ function Dashboard({
     stackId: "a",
     fill: SERIES[i % SERIES.length],
     maxBarSize: 46
-  }))))), siteShare.length > 0 && React.createElement("div", {
-    className: "dl-chart"
-  }, React.createElement("h3", {
-    className: "dl-blockhead"
-  }, "Share of ", fuel, " by site"), React.createElement(ResponsiveContainer, {
-    width: "100%",
-    height: 250
-  }, React.createElement(PieChart, null, React.createElement(Pie, {
-    data: siteShare,
-    dataKey: "value",
-    nameKey: "name",
-    innerRadius: 52,
-    outerRadius: 82,
-    paddingAngle: 2,
-    stroke: "#fff",
-    strokeWidth: 2
-  }, siteShare.map((d, i) => React.createElement(Cell, {
-    key: d.name,
-    fill: SERIES[i % SERIES.length]
-  }))), React.createElement(Tooltip, {
-    ...TIP,
-    formatter: (v, n) => [`${fmt(v, 0)} L · ${pct(v, litres)}`, n]
-  }), React.createElement(Legend, {
-    wrapperStyle: LEG
-  })))), varData.length > 0 && React.createElement("div", {
-    className: "dl-chart"
-  }, React.createElement("h3", {
-    className: "dl-blockhead"
-  }, "Consumption against standard"), React.createElement(ResponsiveContainer, {
-    width: "100%",
-    height: Math.max(200, varData.length * 30 + 40)
-  }, React.createElement(BarChart, {
-    data: varData,
-    layout: "vertical",
-    margin: {
-      top: 4,
-      right: 40,
-      left: 4,
-      bottom: 4
-    }
-  }, React.createElement(CartesianGrid, {
-    stroke: "#E4E9EE",
-    horizontal: false
-  }), React.createElement(XAxis, {
-    type: "number",
-    tick: AX,
-    axisLine: AXL,
-    tickLine: false,
-    unit: "%"
-  }), React.createElement(YAxis, {
-    type: "category",
-    dataKey: "name",
-    tick: AX,
-    axisLine: AXL,
-    tickLine: false,
-    width: 112
-  }), React.createElement(Tooltip, {
-    ...TIP,
-    formatter: v => [`${v >= 0 ? "+" : ""}${fmt(v, 1)}%`, "vs standard"]
-  }), React.createElement(ReferenceLine, {
-    x: 0,
-    stroke: "#0C2B25",
-    strokeWidth: 1.5
-  }), React.createElement(Bar, {
-    dataKey: "value",
-    maxBarSize: 20
-  }, varData.map(d => React.createElement(Cell, {
-    key: d.name,
-    fill: d.status === "over" ? C_OVER : d.status === "watch" ? C_WATCH : C_OK
-  })), React.createElement(LabelList, {
-    dataKey: "value",
-    position: "right",
-    formatter: v => `${v >= 0 ? "+" : ""}${fmt(v, 1)}%`,
-    style: {
-      fontSize: 10,
-      fill: "#33584C"
-    }
-  })))), React.createElement("p", {
-    className: "dl-legend"
-  }, "Bars right of the line are burning more than their standard allows.")), useSplit.length > 0 && React.createElement("div", {
-    className: "dl-chart"
-  }, React.createElement("h3", {
-    className: "dl-blockhead"
-  }, fuel, " by purpose"), React.createElement(ResponsiveContainer, {
-    width: "100%",
-    height: 250
-  }, React.createElement(PieChart, null, React.createElement(Pie, {
-    data: useSplit,
-    dataKey: "value",
-    nameKey: "name",
-    innerRadius: 52,
-    outerRadius: 82,
-    paddingAngle: 2,
-    stroke: "#fff",
-    strokeWidth: 2
-  }, useSplit.map(d => React.createElement(Cell, {
-    key: d.name,
-    fill: d.name === "Work oriented" ? "#0C2B25" : d.name === "Ancillary" ? "#3A6EA5" : d.name === "Camp establishment" ? "#C86A15" : "#B9C4CF"
-  }))), React.createElement(Tooltip, {
-    ...TIP,
-    formatter: (v, nm, pl) => [`${fmt(v, 0)} L · ${pct(v, litres)} · ${pl && pl.payload ? pl.payload.count : 0} machines`, nm]
-  }), React.createElement(Legend, {
-    wrapperStyle: LEG
-  }))), React.createElement("p", {
-    className: "dl-legend"
-  }, "Fuel going to the camp and to ancillary plant is real cost that produces no measurable output — worth knowing as a share before it is argued over.")), ownSplit.length > 0 && React.createElement("div", {
-    className: "dl-chart"
-  }, React.createElement("h3", {
-    className: "dl-blockhead"
-  }, "Own plant against hired"), React.createElement(ResponsiveContainer, {
-    width: "100%",
-    height: 250
-  }, React.createElement(PieChart, null, React.createElement(Pie, {
-    data: ownSplit,
-    dataKey: "value",
-    nameKey: "name",
-    innerRadius: 52,
-    outerRadius: 82,
-    paddingAngle: 2,
-    stroke: "#fff",
-    strokeWidth: 2
-  }, ownSplit.map(d => React.createElement(Cell, {
-    key: d.name,
-    fill: d.name === "Hired" ? "#8A4E0B" : "#0C2B25"
-  }))), React.createElement(Tooltip, {
-    ...TIP,
-    formatter: (v, nm, pl) => [`${fmt(v, 0)} L · ${pct(v, litres)} · ${pl && pl.payload ? pl.payload.count : 0} machines`, nm]
-  }), React.createElement(Legend, {
-    wrapperStyle: LEG
-  }))), React.createElement("p", {
-    className: "dl-legend"
-  }, "Hired plant is where fuel discipline slips most easily — worth watching as a share.")), catData.length > 0 && React.createElement("div", {
-    className: "dl-chart"
-  }, React.createElement("h3", {
-    className: "dl-blockhead"
-  }, fuel, " by machine type"), React.createElement(ResponsiveContainer, {
-    width: "100%",
-    height: Math.max(200, catData.length * 30 + 40)
-  }, React.createElement(BarChart, {
-    data: catData,
-    layout: "vertical",
-    margin: {
-      top: 4,
-      right: 48,
-      left: 4,
-      bottom: 4
-    }
-  }, React.createElement(CartesianGrid, {
-    stroke: "#E4E9EE",
-    horizontal: false
-  }), React.createElement(XAxis, {
-    type: "number",
-    tick: AX,
-    axisLine: AXL,
-    tickLine: false,
-    unit: " L"
-  }), React.createElement(YAxis, {
-    type: "category",
-    dataKey: "name",
-    tick: AX,
-    axisLine: AXL,
-    tickLine: false,
-    width: 112
-  }), React.createElement(Tooltip, {
-    ...TIP,
-    formatter: v => [`${fmt(v, 0)} L`, "Fuel"]
-  }), React.createElement(Bar, {
-    dataKey: "value",
-    fill: "#0C2B25",
-    maxBarSize: 20
-  }, React.createElement(LabelList, {
-    dataKey: "value",
-    position: "right",
-    formatter: v => fmt(v, 0),
-    style: {
-      fontSize: 10,
-      fill: "#33584C"
-    }
-  }))))), topUsers.length > 0 && React.createElement("div", {
-    className: "dl-chart wide"
-  }, React.createElement("h3", {
-    className: "dl-blockhead"
-  }, "Heaviest machines by ", fuel, " drawn"), React.createElement(ResponsiveContainer, {
-    width: "100%",
-    height: Math.max(200, topUsers.length * 32 + 40)
-  }, React.createElement(BarChart, {
-    data: topUsers,
-    layout: "vertical",
-    margin: {
-      top: 4,
-      right: 64,
-      left: 4,
-      bottom: 4
-    }
-  }, React.createElement(CartesianGrid, {
-    stroke: "#E4E9EE",
-    horizontal: false
-  }), React.createElement(XAxis, {
-    type: "number",
-    tick: AX,
-    axisLine: AXL,
-    tickLine: false,
-    unit: " L"
-  }), React.createElement(YAxis, {
-    type: "category",
-    dataKey: "name",
-    tick: AX,
-    axisLine: AXL,
-    tickLine: false,
-    width: 150
-  }), React.createElement(Tooltip, {
-    ...TIP,
-    formatter: (v, n, pl) => [`${fmt(v, 0)} L`, pl && pl.payload ? pl.payload.site : "Fuel"]
-  }), React.createElement(Bar, {
-    dataKey: "value",
-    maxBarSize: 22
-  }, topUsers.map(d => React.createElement(Cell, {
-    key: d.name,
-    fill: d.status === "over" ? C_OVER : d.status === "watch" ? C_WATCH : "#3A6EA5"
-  })), React.createElement(LabelList, {
-    dataKey: "value",
-    position: "right",
-    formatter: v => `${fmt(v, 0)} L`,
-    style: {
-      fontSize: 10,
-      fill: "#33584C"
-    }
   }))))))), React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
@@ -3419,7 +3299,47 @@ function Dashboard({
     }, r.last || "no entries"));
   })))), React.createElement("p", {
     className: "dl-legend"
-  }, "Consumption is measured fill to fill, not shift to shift: fuel goes into a tank and may run the machine for several shifts, so a shift with no issue reads “on tank” rather than zero. Averages are per logged day, not per calendar day. Variance compares actual consumption with the standard set for that machine — positive means it is burning more than it should. Machine-level figures are tracked by volume; values appear only at site and head-office level.")), drill && React.createElement(DrillDown, {
+  }, "Consumption is measured fill to fill, not shift to shift: fuel goes into a tank and may run the machine for several shifts, so a shift with no issue reads “on tank” rather than zero. Averages are per logged day, not per calendar day. Variance compares actual consumption with the standard set for that machine — positive means it is burning more than it should. Machine-level figures are tracked by volume; values appear only at site and head-office level.")), dayDrill && React.createElement(Modal, {
+    title: "Day detail — " + dayDrill.date,
+    onClose: () => setDayDrill(null),
+    wide: true
+  }, Object.values(dayDrill.sites).map(c => React.createElement("div", {
+    key: c.site.id,
+    className: "dl-block",
+    style: {
+      marginTop: 0
+    }
+  }, React.createElement("h4", {
+    className: "dl-drillsite"
+  }, c.site.name, React.createElement("span", null, c.opening !== null ? `opening ${fmt(c.opening, 1)} + received ${fmt(c.received, 1)} − issued ${fmt(c.issued, 1)} = closing ${fmt(c.closing, 1)} L` : "no tank report this day")), c.issues.length === 0 && c.directRows.length === 0 ? React.createElement("p", {
+    className: "dl-hint"
+  }, "Purchases only — no fuel issued at this site this day.") : React.createElement("table", {
+    className: "dl-table"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Fuel user"), React.createElement("th", null, "Source"), React.createElement("th", {
+    className: "r"
+  }, "Litres"))), React.createElement("tbody", null, c.issues.map((x, i) => React.createElement("tr", {
+    key: "t" + i,
+    className: x.id ? "click" : "",
+    onClick: x.id ? () => {
+      setDayDrill(null);
+      onOpen(c.site.id, x.id);
+    } : undefined
+  }, React.createElement("td", null, x.name), React.createElement("td", {
+    className: "dl-sub2"
+  }, "Site tank"), React.createElement("td", {
+    className: "r mono"
+  }, fmt(x.qty, 1)))), c.directRows.map((x, i) => React.createElement("tr", {
+    key: "d" + i,
+    className: "click",
+    onClick: () => {
+      setDayDrill(null);
+      onOpen(c.site.id, x.id);
+    }
+  }, React.createElement("td", null, x.name), React.createElement("td", {
+    className: "dl-sub2"
+  }, "Direct from pump"), React.createElement("td", {
+    className: "r mono"
+  }, fmt(x.qty, 1))))))))), drill && React.createElement(DrillDown, {
     which: drill,
     fuel: fuel,
     sites: sites,
