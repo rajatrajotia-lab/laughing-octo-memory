@@ -2125,9 +2125,9 @@ function DieselLogbook() {
     value: rates.HSD || rates.Petrol ? "₹ " + fmt(siteRoll.reduce((a, b) => a + b.litres * (rates[fuelOf(b.m)] || 0), 0), 0) : "—",
     unit: rates.HSD || rates.Petrol ? `at this site's own rates${rates.HSD ? ` · HSD ₹${fmt(rates.HSD, 2)}` : ""}${rates.Petrol ? ` · Petrol ₹${fmt(rates.Petrol, 2)}` : ""}` : "no rate entered on any receipt"
   }), React.createElement(Kpi, {
-    label: "Hired plant",
-    value: "₹ " + fmt(machines.filter(m => ownerOf(m) === "Hired").reduce((a, m) => a + rentFor(m, month === "all" ? null : month), 0), 0),
-    unit: `per month · ${machines.filter(m => ownerOf(m) === "Hired").length} of ${machines.length} hired`
+    label: "Plant cost",
+    value: "₹ " + fmt(machines.reduce((a, m) => a + (ownerOf(m) === "Hired" ? rentFor(m, month === "all" ? null : month) : num(m.ownCost)), 0), 0),
+    unit: `per month · ${machines.filter(m => ownerOf(m) === "Hired").length} hired + ${machines.filter(m => ownerOf(m) !== "Hired" && num(m.ownCost) > 0).length} own costed`
   }), React.createElement(Kpi, {
     label: "Machines over norm",
     value: siteRoll.filter(r => r.status === "over").length,
@@ -2809,13 +2809,18 @@ function Dashboard({
       count: rs.length
     };
   }).filter(x => x.count > 0);
-  const seenHired = new Set();
-  const hired = overview.flatMap(s => s.rows).filter(r => {
-    if (r.own !== "Hired" || seenHired.has(r.m.id)) return false;
-    seenHired.add(r.m.id);
-    return true;
-  });
-  const rentTotal = hired.reduce((a, r) => a + r.rent, 0);
+  const seenPlant = new Set();
+  const plantRows = overview.flatMap(s => s.rows).filter(r => {
+    if (seenPlant.has(r.m.id)) return false;
+    seenPlant.add(r.m.id);
+    return r.own === "Hired" || num(r.m.ownCost) > 0;
+  }).map(r => ({
+    r,
+    cost: r.own === "Hired" ? r.rent : num(r.m.ownCost)
+  }));
+  const plantTotal = plantRows.reduce((a, x) => a + x.cost, 0);
+  const plantHired = plantRows.filter(x => x.r.own === "Hired").length;
+  const plantOwn = plantRows.length - plantHired;
   const useSplit = USAGE.map(u => {
     const rs = allRows.filter(r => r.usage === u);
     return {
@@ -2918,9 +2923,9 @@ function Dashboard({
     unit: `litres across ${sites.filter(x => (x.st.closing || 0) > 0).length} site(s)`,
     onClick: () => setDrill("stock")
   }), React.createElement(Kpi, {
-    label: "Hired plant",
-    value: "₹ " + fmt(rentTotal, 0),
-    unit: `per month · ${hired.length} machines`,
+    label: "Plant cost",
+    value: "₹ " + fmt(plantTotal, 0),
+    unit: `per month · ${plantHired} hired + ${plantOwn} own`,
     onClick: () => setDrill("rent")
   }), React.createElement(Kpi, {
     label: "Above standard",
@@ -3389,7 +3394,7 @@ function DrillDown({
     consumed: `${fuel} consumed — site and machine detail`,
     stock: `${fuel} stock in hand — site detail`,
     over: "Machines above standard",
-    rent: "Hired plant — monthly commitment"
+    rent: "Plant cost — monthly commitment, site-wise"
   };
   let body = null;
   if (which === "purchased") {
@@ -3510,38 +3515,64 @@ function DrillDown({
     }))));
   }
   if (which === "rent") {
-    const rows = sitesAll.flatMap(s => s.rows.filter(r => r.own === "Hired")).sort((a, b) => b.rent - a.rent);
-    const total = rows.reduce((a, r) => a + r.rent, 0);
-    body = rows.length === 0 ? React.createElement("p", {
+    const bySite = {};
+    sitesAll.forEach(s => s.rows.forEach(r => {
+      const cost = r.own === "Hired" ? r.rent : num(r.m.ownCost);
+      if (r.own !== "Hired" && cost <= 0) return;
+      const g = bySite[s.site.id] || (bySite[s.site.id] = {
+        site: s.site,
+        total: 0,
+        rows: []
+      });
+      g.total += cost;
+      g.rows.push({
+        r,
+        cost
+      });
+    }));
+    const groups = Object.values(bySite).sort((a, b) => b.total - a.total);
+    const grand = groups.reduce((a, g) => a + g.total, 0);
+    body = groups.length === 0 ? React.createElement("p", {
       className: "dl-hint"
-    }, "No machine is marked as hired.") : React.createElement("div", {
+    }, "No machine carries a monthly cost yet — hire rates go on hired machines, owning costs on own machines, in the Fuel Users master.") : React.createElement(React.Fragment, null, groups.map(g => React.createElement("div", {
+      key: g.site.id,
+      className: "dl-block",
+      style: {
+        marginTop: 0
+      }
+    }, React.createElement("h4", {
+      className: "dl-drillsite"
+    }, g.site.name, React.createElement("span", null, "₹ ", fmt(g.total, 0), " / month", groups.length > 1 ? ` · ${pct(g.total, grand)} of company` : "")), React.createElement("div", {
       className: "dl-tablewrap"
     }, React.createElement("table", {
       className: "dl-table"
-    }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Machine"), React.createElement("th", null, "Site"), React.createElement("th", null, "Hired from"), React.createElement("th", null, "Type"), React.createElement("th", {
+    }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Machine"), React.createElement("th", null, "Owned / hired"), React.createElement("th", null, "Hired from"), React.createElement("th", {
       className: "r"
-    }, "₹ per month"))), React.createElement("tbody", null, rows.map(r => React.createElement("tr", {
-      key: (r.site ? r.site.id + ":" : "") + r.m.id,
+    }, "₹ per month"), React.createElement("th", {
+      className: "r"
+    }, "Share of site"))), React.createElement("tbody", null, g.rows.sort((a, b) => b.cost - a.cost).map(({
+      r,
+      cost
+    }) => React.createElement("tr", {
+      key: r.m.id,
       className: "click",
       onClick: () => {
         onOpen(r.site.id, r.m.id);
         onClose();
       }
-    }, React.createElement("td", null, React.createElement("strong", null, r.m.name), r.m.code && React.createElement("span", {
+    }, React.createElement("td", null, React.createElement("strong", null, r.m.name), React.createElement("span", {
       className: "dl-sub"
-    }, r.m.code)), React.createElement("td", {
+    }, r.m.category, r.m.code ? ` · ${r.m.code}` : "")), React.createElement("td", null, React.createElement("span", {
+      className: "dl-own " + r.own.toLowerCase()
+    }, r.own)), React.createElement("td", {
       className: "dl-sub2"
-    }, r.site.name), React.createElement("td", null, r.m.owner || "—"), React.createElement("td", {
-      className: "dl-sub2"
-    }, r.m.category), React.createElement("td", {
+    }, r.m.owner || "—"), React.createElement("td", {
       className: "r mono"
-    }, r.rent ? fmt(r.rent, 0) : React.createElement("span", {
+    }, cost > 0 ? fmt(cost, 0) : React.createElement("span", {
       className: "flag over"
-    }, "not set"))))), React.createElement("tfoot", null, React.createElement("tr", null, React.createElement("td", {
-      colSpan: 4
-    }, "Total monthly commitment"), React.createElement("td", {
+    }, "not set")), React.createElement("td", {
       className: "r mono"
-    }, "₹ ", fmt(total, 0))))));
+    }, pct(cost, g.total))))))))));
   }
   if (which === "over") {
     const bySite = {};
@@ -4721,7 +4752,14 @@ function MachineDialog({
     value: m.owner || "",
     onChange: e => set("owner", e.target.value),
     placeholder: "owner / vendor name"
-  }))), React.createElement(F, {
+  }))), !isSub && m.ownership === "Own" && React.createElement(F, {
+    label: "Monthly owning cost (₹)"
+  }, React.createElement("input", {
+    type: "number",
+    value: m.ownCost || "",
+    onChange: e => set("ownCost", e.target.value),
+    placeholder: "EMI, depreciation, upkeep"
+  })), React.createElement(F, {
     label: "Fuel"
   }, React.createElement("select", {
     value: m.fuel,
