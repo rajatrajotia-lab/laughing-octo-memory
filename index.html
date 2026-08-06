@@ -2483,17 +2483,7 @@ function DieselLogbook() {
       ...form,
       close: e.target.value
     })
-  })), React.createElement(F, {
-    label: "Fuel source"
-  }, React.createElement("select", {
-    value: form.source || "Site tank",
-    onChange: e => setForm({
-      ...form,
-      source: e.target.value
-    })
-  }, SOURCES.map(x => React.createElement("option", {
-    key: x
-  }, x)))), machine.category !== "Subcontractor" && React.createElement(F, {
+  })), machine.category !== "Subcontractor" && React.createElement(F, {
     label: "Machine condition"
   }, React.createElement("select", {
     value: form.condition || "Working",
@@ -3107,7 +3097,7 @@ function Dashboard({
     className: "dl-sub2"
   }, Object.values(dy.sites).map(c => c.site.nick || c.site.name).join(", "))))))), React.createElement("p", {
     className: "dl-legend"
-  }, "Opening stock is the previous day's closing carried forward. Opening + purchased − issues from the tank = closing; fuel drawn direct from the pump counts in Consumed but never passes through the tank, so it does not move the closing stock. Click a row for the day's site-wise and machine-wise break-up.")), tab === "overview" && React.createElement("div", {
+  }, "Opening stock is the previous day's closing carried forward — opening + purchased − issues = closing. Click a row for the day's site-wise and machine-wise break-up.")), tab === "overview" && React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
