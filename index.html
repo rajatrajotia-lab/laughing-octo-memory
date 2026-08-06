@@ -454,7 +454,17 @@ const conditionOf = e => CONDITIONS.includes(e.condition) ? e.condition : "Worki
 const downHoursOf = e => num(e.downHours);
 const SHIFTS = ["Day", "Night"];
 const SHIFT_HOURS = 12;
-const shiftOf = e => e && e.shift === "Night" ? "Night" : "Day";
+const shiftOf = e => e && e.shift === "Night" ? "Night" : e && e.shift === "Day" ? "Day" : "Full";
+const capOf = sh => sh === "Full" ? 24 : SHIFT_HOURS;
+const isClock = m => m && m.meterType === "clock";
+const parseClock = t => {
+  const mt = /^(\d{1,2}):(\d{2})$/.exec(String(t || "").trim());
+  if (!mt) return null;
+  const h = +mt[1],
+    mi = +mt[2];
+  if (h > 23 || mi > 59) return null;
+  return h + mi / 60;
+};
 const shiftKey = e => `${e.date || ""}#${shiftOf(e) === "Night" ? 1 : 0}`;
 function previousClose(logs, date, shift, exceptId) {
   const key = `${date}#${shift === "Night" ? 1 : 0}`;
@@ -473,7 +483,7 @@ const blankEntry = () => ({
   date: today(),
   source: "Site tank",
   condition: "Working",
-  shift: "Day",
+  shift: "Full",
   downHours: "",
   downReason: "",
   slip: "",
@@ -757,7 +767,8 @@ function buildAlerts(data) {
         const set = byDate[d];
         const dayN = set.filter(e => shiftOf(e) === "Day").length;
         const nightN = set.filter(e => shiftOf(e) === "Night").length;
-        if (dayN > 1 || nightN > 1 || set.length > SHIFTS.length) {
+        const fullN = set.filter(e => shiftOf(e) === "Full").length;
+        if (dayN > 1 || nightN > 1 || fullN > 1 || fullN >= 1 && set.length > 1 || set.length > SHIFTS.length) {
           const hrs = set.reduce((a, e) => a + calcRow(e, m).run, 0);
           push({
             level: "critical",
@@ -767,21 +778,21 @@ function buildAlerts(data) {
             fuel: fuelOf(m),
             date: d,
             title: "Same shift entered twice",
-            detail: `${m.name} on ${d}: ${dayN} day and ${nightN} night entr${dayN + nightN === 1 ? "y" : "ies"}, totalling ${fmt(hrs, 1)} ${m.meterType === "hours" ? "hours" : "km"}. ` + `A day takes one day shift and one night shift — delete the extra.`
+            detail: `${m.name} on ${d}: ${dayN} day and ${nightN} night entr${dayN + nightN === 1 ? "y" : "ies"}, totalling ${fmt(hrs, 1)} ${m.meterType !== "km" ? "hours" : "km"}. ` + `A day takes one day shift and one night shift — delete the extra.`
           });
         }
-        if (m.meterType === "hours") {
+        if (m.meterType !== "km") {
           set.forEach(e => {
             const used = calcRow(e, m).run + downHoursOf(e);
-            if (used > SHIFT_HOURS + 0.01) push({
+            if (used > capOf(shiftOf(e)) + 0.01) push({
               level: "warn",
               kind: "longshift",
               site: s,
               machine: m,
               fuel: fuelOf(m),
               date: d,
-              title: "Shift longer than twelve hours",
-              detail: `${m.name}, ${shiftOf(e).toLowerCase()} shift on ${d}: ${fmt(used, 1)} hours run and down against a ${SHIFT_HOURS}-hour shift. Split it across both shifts.`
+              title: "More hours than the entry window holds",
+              detail: `${m.name} on ${d}: ${fmt(used, 1)} hours run and down against ${capOf(shiftOf(e))} hours in ${shiftOf(e) === "Full" ? "the day" : "the " + shiftOf(e).toLowerCase() + " shift"}. Check the readings.`
             });
           });
         }
@@ -799,7 +810,7 @@ function buildAlerts(data) {
         run += r.run;
         litres += r.litres;
       });
-      const hrs = m.meterType === "hours";
+      const hrs = m.meterType !== "km";
       const eff = hrs ? run > 0 ? litres / run : null : litres > 0 && run > 0 ? run / litres : null;
       const v = variancePct(eff, m);
       if (v !== null && v > 15) push({
@@ -840,7 +851,7 @@ function fillCycles(entries, machine) {
     }
   });
   if (cur) out.push(cur);
-  const hrs = machine.meterType === "hours";
+  const hrs = machine.meterType !== "km";
   return out.map(c => ({
     ...c,
     eff: hrs ? c.run > 0 ? c.litres / c.run : null : c.litres > 0 && c.run > 0 ? c.run / c.litres : null
@@ -848,9 +859,19 @@ function fillCycles(entries, machine) {
 }
 function calcRow(entry, machine) {
   const has = v => v !== "" && v !== null && v !== undefined;
-  const run = has(entry.open) && has(entry.close) ? num(entry.close) - num(entry.open) : 0;
+  let run = 0;
+  if (isClock(machine)) {
+    const a = parseClock(entry.open),
+      b = parseClock(entry.close);
+    if (a !== null && b !== null) {
+      run = b - a;
+      if (run < 0) run += 24;
+    }
+  } else {
+    run = has(entry.open) && has(entry.close) ? num(entry.close) - num(entry.open) : 0;
+  }
   const litres = num(entry.litres);
-  const hours = machine.meterType === "hours";
+  const hours = machine.meterType !== "km";
   let eff = null;
   if (hours && run > 0) eff = litres / run;
   if (!hours && litres > 0 && run > 0) eff = run / litres;
@@ -863,7 +884,7 @@ function calcRow(entry, machine) {
 function statusOf(eff, machine) {
   const norm = num(machine.norm);
   if (!norm || eff === null) return "none";
-  const hours = machine.meterType === "hours";
+  const hours = machine.meterType !== "km";
   const ratio = hours ? eff / norm : norm / eff;
   if (ratio > 1.15) return "over";
   if (ratio > 1.05) return "watch";
@@ -872,7 +893,7 @@ function statusOf(eff, machine) {
 function variancePct(eff, machine) {
   const norm = num(machine.norm);
   if (!norm || eff === null || eff === undefined || isNaN(eff)) return null;
-  const ratio = machine.meterType === "hours" ? eff / norm : norm / eff;
+  const ratio = machine.meterType !== "km" ? eff / norm : norm / eff;
   return (ratio - 1) * 100;
 }
 const KSDP_TAG = "ksdp_rayagada_20260806_recon";
@@ -1238,7 +1259,7 @@ function DieselLogbook() {
   }, [data]);
   const inMonth = e => month === "all" || (e.date || "").slice(0, 7) === month;
   const log = useMemo(() => rawLog.filter(inMonth).slice().sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0), [rawLog, month]);
-  const carried = useMemo(() => machine && form.date ? previousClose(data.logs[machine.id] || [], form.date, shiftOf(form), editId) : null, [machine, data.logs, form.date, form.shift, editId]);
+  const carried = useMemo(() => machine && form.date && !isClock(machine) ? previousClose(data.logs[machine.id] || [], form.date, shiftOf(form), editId) : null, [machine, data.logs, form.date, form.shift, editId]);
   useEffect(() => {
     if (carried === null) return;
     const want = String(carried);
@@ -1263,7 +1284,7 @@ function DieselLogbook() {
       run += r.run;
       litres += r.litres;
     });
-    const hours = machine.meterType === "hours";
+    const hours = machine.meterType !== "km";
     const eff = hours ? run > 0 ? litres / run : null : litres > 0 && run > 0 ? run / litres : null;
     let downHrs = 0,
       downDays = 0;
@@ -1277,7 +1298,7 @@ function DieselLogbook() {
       eff,
       downHrs,
       downDays,
-      avail: machine.meterType === "hours" ? availability(run, downHrs) : null,
+      avail: machine.meterType !== "km" ? availability(run, downHrs) : null,
       cost: litres * (rates[fuelOf(machine)] || 0),
       rated: !!rates[fuelOf(machine)],
       count: log.length
@@ -1295,7 +1316,7 @@ function DieselLogbook() {
         run += r.run;
         litres += r.litres;
       });
-      const hours = m.meterType === "hours";
+      const hours = m.meterType !== "km";
       const eff = hours ? run > 0 ? litres / run : null : litres > 0 && run > 0 ? run / litres : null;
       return {
         m,
@@ -1335,7 +1356,7 @@ function DieselLogbook() {
             if (e.date > last) last = e.date;
           }
         });
-        const hrs = m.meterType === "hours";
+        const hrs = m.meterType !== "km";
         const eff = hrs ? run > 0 ? litres / run : null : litres > 0 && run > 0 ? run / litres : null;
         const d = days.size;
         return {
@@ -1573,22 +1594,25 @@ function DieselLogbook() {
     if (isLocked(data, site.id, form.date)) return setNote(`${monthLabel(form.date.slice(0, 7))} is locked for this site.`);
     const sh = shiftOf(form);
     const sameDay = (data.logs[machine.id] || []).filter(e => e.date === form.date && e.id !== editId);
+    if (sh === "Full" && sameDay.length > 0) return setNote(`${machine.name} already has an entry for ${form.date}. A full-day entry has to be the only one for its date — edit the existing entry, or switch this one to a shift.`);
+    if (sh !== "Full" && sameDay.some(e => shiftOf(e) === "Full")) return setNote(`${form.date} already has a full-day entry for ${machine.name}. Edit that entry, or delete it to switch to shift-wise entries.`);
     const clash = sameDay.find(e => shiftOf(e) === sh);
     if (clash) return setNote(`${machine.name} already has a ${sh.toLowerCase()} shift entry for ${form.date}` + `${clash.origin === "stock" ? ", raised from that day's fuel report" : ""}. ` + `Edit it rather than adding another.`);
     if (sameDay.length >= SHIFTS.length) return setNote(`${machine.name} already has both shifts entered for ${form.date}. A day takes two entries at most.`);
-    if (carried !== null && Math.abs(num(form.open) - carried) > 0.001) return setNote(`The ${sh === "Night" ? "day" : "previous"} shift closed on ${fmt(carried, 1)}. ` + `The opening reading has to match it.`);
+    if (carried !== null && Math.abs(num(form.open) - carried) > 0.001) return setNote(`The previous entry closed on ${fmt(carried, 1)}. ` + `The opening reading has to match it.`);
     const dwn = num(form.downHours);
-    if (machine.meterType === "hours") {
+    const hourCap = capOf(sh);
+    if (machine.meterType !== "km") {
       const ran = calcRow(form, machine).run;
-      if (ran > SHIFT_HOURS) return setNote(`${fmt(ran, 1)} hours on one shift — a shift holds ${SHIFT_HOURS}. ` + `If the machine worked through, enter the other shift separately.`);
-      if (ran + dwn > SHIFT_HOURS) return setNote(`${fmt(ran, 1)} hours run plus ${fmt(dwn, 1)} down is ${fmt(ran + dwn, 1)} — a shift holds ${SHIFT_HOURS}.`);
+      if (ran > hourCap) return setNote(`${fmt(ran, 1)} hours in one entry — ${sh === "Full" ? "a day holds 24" : `a shift holds ${SHIFT_HOURS}`}. Check the readings.`);
+      if (ran + dwn > hourCap) return setNote(`${fmt(ran, 1)} hours run plus ${fmt(dwn, 1)} down is ${fmt(ran + dwn, 1)} — more than the ${hourCap} hours this entry covers.`);
     }
-    if (dwn > SHIFT_HOURS) return setNote(`${fmt(dwn, 1)} hours down is more than the ${SHIFT_HOURS} hours in a shift.`);
+    if (dwn > hourCap) return setNote(`${fmt(dwn, 1)} hours down is more than the ${hourCap} hours this entry covers.`);
     if (num(form.litres) < 0) return setNote("Fuel issued cannot be negative.");
     if (num(form.litres) === 0 && calcRow(form, machine).run <= 0 && num(form.downHours) <= 0) return setNote("Nothing to record — enter a closing reading, fuel issued, or down time.");
     const hasClose = form.close !== "" && form.close !== null && form.close !== undefined;
-    if (hasClose && num(form.close) < num(form.open)) return setNote("Closing reading is lower than opening.");
-    if (hasClose) {
+    if (hasClose && !isClock(machine) && num(form.close) < num(form.open)) return setNote("Closing reading is lower than opening.");
+    if (hasClose && !isClock(machine)) {
       const key = shiftKey({
         date: form.date,
         shift: sh
@@ -1864,7 +1888,7 @@ function DieselLogbook() {
       Array.from(touched).map(id => (findMachine(d, id) || {}).m).filter(m => m && fuelOf(m) === (rec.fuel || "HSD")).forEach(m => {
         const qty = num((rec.issues || {})[m.id]);
         const logs = d.logs[m.id] || (d.logs[m.id] = []);
-        const idx = logs.findIndex(l => l.date === rec.date && shiftOf(l) === "Day" && l.origin === "stock");
+        const idx = logs.findIndex(l => l.date === rec.date && l.origin === "stock");
         if (qty > 0) {
           if (idx >= 0) {
             logs[idx].litres = qty;
@@ -1874,7 +1898,7 @@ function DieselLogbook() {
               ...blankEntry(),
               id: uid(),
               date: rec.date,
-              shift: "Day",
+              shift: "Full",
               litres: qty,
               origin: "stock",
               siteId: site.id,
@@ -1961,7 +1985,7 @@ function DieselLogbook() {
       o.count += 1;
       o.days.add(e.date);
     });
-    const hrs = machine.meterType === "hours";
+    const hrs = machine.meterType !== "km";
     return Object.values(by).sort((a, b) => a.month < b.month ? 1 : -1).map(o => {
       const eff = hrs ? o.run > 0 ? o.litres / o.run : null : o.litres > 0 && o.run > 0 ? o.run / o.litres : null;
       return {
@@ -1973,8 +1997,8 @@ function DieselLogbook() {
       };
     });
   }, [rawLog, machine]);
-  const unit = machine ? machine.meterType === "hours" ? "L/hr" : "km/L" : "";
-  const runUnit = machine ? machine.meterType === "hours" ? "hrs" : "km" : "";
+  const unit = machine ? machine.meterType !== "km" ? "L/hr" : "km/L" : "";
+  const runUnit = machine ? machine.meterType !== "km" ? "hrs" : "km" : "";
   if (!loaded) return React.createElement("div", {
     className: "dl-root"
   }, React.createElement("style", null, css), React.createElement("p", {
@@ -2249,13 +2273,13 @@ function DieselLogbook() {
     className: "r mono"
   }, fmt(r.run, 1), " ", React.createElement("span", {
     className: "dl-u"
-  }, r.m.meterType === "hours" ? "hrs" : "km")), React.createElement("td", {
+  }, r.m.meterType !== "km" ? "hrs" : "km")), React.createElement("td", {
     className: "r mono"
   }, fmt(r.litres, 1)), React.createElement("td", {
     className: "r mono"
   }, r.eff === null ? "—" : fmt(r.eff), " ", React.createElement("span", {
     className: "dl-u"
-  }, r.m.meterType === "hours" ? "L/hr" : "km/L")), React.createElement("td", {
+  }, r.m.meterType !== "km" ? "L/hr" : "km/L")), React.createElement("td", {
     className: "r mono"
   }, r.m.norm || "—"), React.createElement("td", null, React.createElement(Gauge, {
     eff: r.eff,
@@ -2277,7 +2301,7 @@ function DieselLogbook() {
     className: "dl-panel"
   }, React.createElement("div", {
     className: "dl-panelhead"
-  }, React.createElement("div", null, React.createElement("h2", null, machine.name), React.createElement("p", null, machine.category, " · ", machine.code || "no reg no", " · ", fuelOf(machine), " ·", " ", machine.meterType === "hours" ? "hour meter" : "odometer", " ·", " ", React.createElement("span", {
+  }, React.createElement("div", null, React.createElement("h2", null, machine.name), React.createElement("p", null, machine.category, " · ", machine.code || "no reg no", " · ", fuelOf(machine), " ·", " ", machine.meterType !== "km" ? "hour meter" : "odometer", " ·", " ", React.createElement("span", {
     className: "dl-own " + ownerOf(machine).toLowerCase()
   }, ownerOf(machine) === "Hired" ? `Hired${machine.owner ? " from " + machine.owner : ""}` : "Own")), React.createElement("p", {
     className: "dl-siteNorm"
@@ -2323,7 +2347,7 @@ function DieselLogbook() {
   }, "Remove machine"))), React.createElement("div", {
     className: "dl-kpis"
   }, React.createElement(Kpi, {
-    label: machine.meterType === "hours" ? "Hours run" : "Distance run",
+    label: machine.meterType !== "km" ? "Hours run" : "Distance run",
     value: fmt(totals.run, 1),
     unit: runUnit
   }), React.createElement(Kpi, {
@@ -2418,7 +2442,7 @@ function DieselLogbook() {
       date: e.target.value
     })
   })), React.createElement(F, {
-    label: "Shift",
+    label: "Entry covers",
     accent: true
   }, React.createElement("select", {
     value: shiftOf(form),
@@ -2426,10 +2450,13 @@ function DieselLogbook() {
       ...form,
       shift: e.target.value
     })
-  }, SHIFTS.map(x => React.createElement("option", {
-    key: x,
-    value: x
-  }, x, " shift")))), React.createElement(F, {
+  }, React.createElement("option", {
+    value: "Full"
+  }, "Full day (up to 24 hrs)"), React.createElement("option", {
+    value: "Day"
+  }, "Day shift"), React.createElement("option", {
+    value: "Night"
+  }, "Night shift"))), React.createElement(F, {
     label: "Slip no."
   }, React.createElement("input", {
     value: form.slip,
@@ -2438,21 +2465,39 @@ function DieselLogbook() {
       slip: e.target.value
     }),
     placeholder: "e.g. 214"
-  })), machine.category !== "Subcontractor" && React.createElement(F, {
-    label: (machine.meterType === "hours" ? "Opening HMR" : "Opening KM") + (carried !== null ? " — carried forward" : "")
+  })), machine.category !== "Subcontractor" && !isClock(machine) && React.createElement(F, {
+    label: (machine.meterType !== "km" ? "Opening HMR" : "Opening KM") + (carried !== null ? " — carried forward" : "")
   }, React.createElement("input", {
     type: "number",
     value: form.open,
     disabled: carried !== null,
-    title: carried !== null ? "The previous shift closed on this reading, so it cannot be typed over" : "",
+    title: carried !== null ? "The previous entry closed on this reading, so it cannot be typed over" : "",
     onChange: e => setForm({
       ...form,
       open: e.target.value
     })
-  })), machine.category !== "Subcontractor" && React.createElement(F, {
-    label: machine.meterType === "hours" ? "Closing HMR" : "Closing KM"
+  })), machine.category !== "Subcontractor" && !isClock(machine) && React.createElement(F, {
+    label: machine.meterType !== "km" ? "Closing HMR" : "Closing KM"
   }, React.createElement("input", {
     type: "number",
+    value: form.close,
+    onChange: e => setForm({
+      ...form,
+      close: e.target.value
+    })
+  })), machine.category !== "Subcontractor" && isClock(machine) && React.createElement(F, {
+    label: "Time started"
+  }, React.createElement("input", {
+    type: "time",
+    value: form.open,
+    onChange: e => setForm({
+      ...form,
+      open: e.target.value
+    })
+  })), machine.category !== "Subcontractor" && isClock(machine) && React.createElement(F, {
+    label: "Time stopped"
+  }, React.createElement("input", {
+    type: "time",
     value: form.close,
     onChange: e => setForm({
       ...form,
@@ -2545,13 +2590,13 @@ function DieselLogbook() {
     const r = calcRow(form, machine);
     const dwn = num(form.downHours);
     if (r.run <= 0 && r.litres <= 0 && dwn <= 0) return "Fill the readings to see consumption.";
-    const cap = SHIFT_HOURS;
-    const used = (machine.meterType === "hours" ? r.run : 0) + dwn;
+    const cap = capOf(shiftOf(form));
+    const used = (machine.meterType !== "km" ? r.run : 0) + dwn;
     return React.createElement(React.Fragment, null, React.createElement("span", null, fmt(r.run, 1), " ", runUnit), dwn > 0 && React.createElement("span", null, fmt(dwn, 1), " hrs down"), React.createElement("span", null, fmt(r.litres, 1), " L"), React.createElement("span", {
       className: "strong"
-    }, r.eff === null ? "—" : fmt(r.eff), " ", unit), machine.meterType === "hours" && used > 0 && React.createElement("span", {
+    }, r.eff === null ? "—" : fmt(r.eff), " ", unit), machine.meterType !== "km" && used > 0 && React.createElement("span", {
       className: used > cap ? "flag over" : ""
-    }, fmt(used, 1), " of ", cap, " hrs in the ", shiftOf(form).toLowerCase(), " shift"));
+    }, fmt(used, 1), " of ", cap, " hrs", shiftOf(form) === "Full" ? " in the day" : ` in the ${shiftOf(form).toLowerCase()} shift`));
   })()), React.createElement("button", {
     className: "dl-btn",
     onClick: saveEntry
@@ -2569,7 +2614,7 @@ function DieselLogbook() {
     className: "r"
   }, "Closing"), React.createElement("th", {
     className: "r"
-  }, machine.meterType === "hours" ? "Hours" : "KM"), React.createElement("th", {
+  }, machine.meterType !== "km" ? "Hours" : "KM"), React.createElement("th", {
     className: "r"
   }, "Diesel"), React.createElement("th", {
     className: "r"
@@ -3524,7 +3569,7 @@ function DrillDown({
       className: "r mono"
     }, fmt(r.run, 1), " ", React.createElement("span", {
       className: "dl-u"
-    }, r.m.meterType === "hours" ? "hrs" : "km")), React.createElement("td", {
+    }, r.m.meterType !== "km" ? "hrs" : "km")), React.createElement("td", {
       className: "r mono"
     }, fmt(r.litres, 1)), React.createElement("td", {
       className: "r mono flag " + r.status
@@ -3688,7 +3733,7 @@ function DrillDown({
       className: "r mono"
     }, fmt(r.eff), " ", React.createElement("span", {
       className: "dl-u"
-    }, r.m.meterType === "hours" ? "L/hr" : "km/L")), React.createElement("td", {
+    }, r.m.meterType !== "km" ? "L/hr" : "km/L")), React.createElement("td", {
       className: "r mono"
     }, r.m.norm), React.createElement("td", {
       className: "r mono flag over"
@@ -3889,7 +3934,7 @@ function NormMaster({
   }, "Standard"), React.createElement("th", null, "Unit"), React.createElement("th", {
     className: "r"
   }, "Variance"), React.createElement("th", null))), React.createElement("tbody", null, rows.map(r => {
-    const unit = r.m.meterType === "hours" ? "L/hr" : "km/L";
+    const unit = r.m.meterType !== "km" ? "L/hr" : "km/L";
     return React.createElement(React.Fragment, {
       key: (r.site ? r.site.id + ":" : "") + r.m.id
     }, React.createElement("tr", null, React.createElement("td", null, React.createElement("input", {
@@ -4585,7 +4630,7 @@ function Gauge({
   if (!norm || eff === null || eff === undefined || isNaN(eff)) return React.createElement("div", {
     className: "dl-gauge" + (big ? " big" : "") + " idle"
   }, "no norm set");
-  const hours = machine.meterType === "hours";
+  const hours = machine.meterType !== "km";
   const ratio = hours ? eff / norm : norm / eff;
   const pos = Math.max(2, Math.min(98, ratio / 2 * 100));
   const st = statusOf(eff, machine);
@@ -4831,13 +4876,15 @@ function MachineDialog({
     value: "hours"
   }, "Hour meter (HMR)"), React.createElement("option", {
     value: "km"
-  }, "Odometer (KM)"))), !isSub && React.createElement(F, {
-    label: m.meterType === "hours" ? "Norm consumption (L/hr)" : "Norm mileage (km/L)"
+  }, "Odometer (KM)"), React.createElement("option", {
+    value: "clock"
+  }, "No meter — clock time"))), !isSub && React.createElement(F, {
+    label: m.meterType !== "km" ? "Norm consumption (L/hr)" : "Norm mileage (km/L)"
   }, React.createElement("input", {
     type: "number",
     value: m.norm,
     onChange: e => set("norm", e.target.value),
-    placeholder: m.meterType === "hours" ? "e.g. 14" : "e.g. 3.5"
+    placeholder: m.meterType !== "km" ? "e.g. 14" : "e.g. 3.5"
   })), React.createElement("div", {
     className: "dl-modalfoot"
   }, React.createElement("button", {
@@ -4917,7 +4964,7 @@ function summaryRows(data, machines, month, siteId) {
       if (e.date) days.add(e.date);
     });
     const down = downDates.size;
-    const hrs = m.meterType === "hours";
+    const hrs = m.meterType !== "km";
     const eff = hrs ? run > 0 ? litres / run : null : litres > 0 && run > 0 ? run / litres : null;
     return {
       m,
@@ -4926,7 +4973,7 @@ function summaryRows(data, machines, month, siteId) {
       down,
       downHrs,
       bdHrs,
-      avail: m.meterType === "hours" ? availability(run, downHrs) : null,
+      avail: m.meterType !== "km" ? availability(run, downHrs) : null,
       direct,
       run,
       litres,
@@ -4945,7 +4992,7 @@ function logbookRows(data, machine, month, siteId) {
     run += r.run;
     litres += r.litres;
   });
-  const hrs = machine.meterType === "hours";
+  const hrs = machine.meterType !== "km";
   const eff = hrs ? run > 0 ? litres / run : null : litres > 0 && run > 0 ? run / litres : null;
   return {
     entries,
@@ -4982,7 +5029,7 @@ function buildWorkbook(data, site, month, want, chosen) {
   }
   if (want.summary) {
     const aoa = [[`${site.name} — MACHINE SUMMARY`], [site.client || "", site.location || "", "", `Month: ${label}`], [`Extracted: ${today()}`], [], ["Machine", "Reg No.", "Type", "Purpose", "Owned / Hired", "Hired From", "Fuel", "Meter", "Days", "Down Days", "Down Hours", "Breakdown Hours", "Availability %", "Total Run", "Fuel Drawn (L)", "Avg Consumption", "Unit", "Standard", "Variance %"]];
-    summaryRows(data, chosen, month, site.id).forEach(r => aoa.push([r.m.name, r.m.code || "", r.m.category, usageOf(r.m), ownerOf(r.m), r.m.owner || "", fuelOf(r.m), r.m.meterType === "hours" ? "Hours" : "Kilometres", r.days, r.down, +r.downHrs.toFixed(1), +r.bdHrs.toFixed(1), r.avail === null ? "" : +r.avail.toFixed(1), +r.run.toFixed(1), +r.litres.toFixed(1), r.eff === null ? "" : +r.eff.toFixed(2), r.m.meterType === "hours" ? "L/hr" : "km/L", num(r.m.norm) || "", r.variance === null ? "" : +r.variance.toFixed(1)]));
+    summaryRows(data, chosen, month, site.id).forEach(r => aoa.push([r.m.name, r.m.code || "", r.m.category, usageOf(r.m), ownerOf(r.m), r.m.owner || "", fuelOf(r.m), r.m.meterType !== "km" ? "Hours" : "Kilometres", r.days, r.down, +r.downHrs.toFixed(1), +r.bdHrs.toFixed(1), r.avail === null ? "" : +r.avail.toFixed(1), +r.run.toFixed(1), +r.litres.toFixed(1), r.eff === null ? "" : +r.eff.toFixed(2), r.m.meterType !== "km" ? "L/hr" : "km/L", num(r.m.norm) || "", r.variance === null ? "" : +r.variance.toFixed(1)]));
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     Object.assign(ws, widths([26, 14, 16, 18, 13, 18, 8, 12, 7, 10, 11, 15, 12, 11, 14, 15, 8, 10, 11]));
     XLSX.utils.book_append_sheet(wb, ws, sheetName("Machine Summary", used));
@@ -4991,7 +5038,7 @@ function buildWorkbook(data, site, month, want, chosen) {
     chosen.forEach(m => {
       const lb = logbookRows(data, m, month, site.id);
       if (lb.entries.length === 0) return;
-      const hrs = m.meterType === "hours";
+      const hrs = m.meterType !== "km";
       const aoa = [[`${m.name}${m.code ? " — " + m.code : ""}`], [site.name, "", "", `Month: ${label}`], [`${m.category} · ${usageOf(m) || "purpose not set"} · ${ownerOf(m)}${m.owner ? " from " + m.owner : ""}`, "", "", `${fuelOf(m)} · standard ${num(normFor(m, site.id)) || "not set"} ${hrs ? "L/hr" : "km/L"}`], [], ["Date", "Shift", "Slip No.", hrs ? "Opening HMR" : "Opening KM", hrs ? "Closing HMR" : "Closing KM", hrs ? "Hours Run" : "KM Run", "Fuel (L)", hrs ? "L/hr" : "km/L", "Condition", "Down Hrs", "Reason", "Source", "Operator", "Work / Location", "Remarks"]];
       lb.entries.forEach(e => {
         const r = calcRow(e, m);
@@ -5365,13 +5412,13 @@ function SummaryReport({
     className: "r mono"
   }, fmt(r.run, 1), " ", React.createElement("span", {
     className: "dl-u"
-  }, r.m.meterType === "hours" ? "hrs" : "km")), React.createElement("td", {
+  }, r.m.meterType !== "km" ? "hrs" : "km")), React.createElement("td", {
     className: "r mono"
   }, React.createElement("strong", null, fmt(r.litres, 1))), React.createElement("td", {
     className: "r mono flag " + r.status
   }, r.eff === null ? "—" : fmt(r.eff), " ", React.createElement("span", {
     className: "dl-u"
-  }, r.m.meterType === "hours" ? "L/hr" : "km/L")), React.createElement("td", {
+  }, r.m.meterType !== "km" ? "L/hr" : "km/L")), React.createElement("td", {
     className: "r mono"
   }, num(r.m.norm) || "—"), React.createElement("td", {
     className: "r mono flag " + r.status
@@ -5390,7 +5437,7 @@ function LogbookReport({
   month
 }) {
   const lb = logbookRows(data, machine, month, site.id);
-  const hrs = machine.meterType === "hours";
+  const hrs = machine.meterType !== "km";
   const unit = hrs ? "L/hr" : "km/L";
   if (lb.entries.length === 0) return React.createElement("p", {
     className: "dl-hint"
@@ -6171,6 +6218,7 @@ const css = `
   font-weight:700;padding:1px 7px;border-radius:2px;margin-left:6px;vertical-align:1px;}
 .dl-shift.day{background:#F6DFAC;color:var(--amber-dk);}
 .dl-shift.night{background:#CCDCD2;color:var(--ink);}
+.dl-shift.full{display:none;}
 
 .dl-recnote{font-size:11.5px;color:var(--steel);background:#E7EFE9;border-left:4px solid var(--amber);
   padding:10px 12px;margin-top:12px;line-height:1.5;font-weight:500;}
