@@ -130,14 +130,18 @@ function createHub(appDir, dataFile) {
       save();
     },
     listen: (ports) => new Promise((resolve, reject) => {
+      /* Try LAN-visible first (WiFi sharing), then local-only for machines
+         whose security policy blocks listening on the network. */
+      const attempts = ports.map(p => ({ p, h: "0.0.0.0" }))
+        .concat(ports.map(p => ({ p, h: "127.0.0.1" })));
       let i = 0;
       const tryNext = () => {
-        if (i >= ports.length) return reject(new Error("no free port"));
-        const p = ports[i++];
+        if (i >= attempts.length) return reject(new Error("no free port"));
+        const a = attempts[i++];
         server.once("error", tryNext);
-        server.listen(p, "0.0.0.0", () => {
+        server.listen(a.p, a.h, () => {
           server.removeListener("error", tryNext);
-          resolve(p);
+          resolve(a.p);
         });
       };
       tryNext();

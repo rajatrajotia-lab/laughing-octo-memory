@@ -17,6 +17,12 @@ function createWindow() {
   });
   if (hubPort) {
     win.loadURL("http://127.0.0.1:" + hubPort + "/");
+    /* Security software on office machines sometimes blocks even local
+       servers — if the page cannot load, fall back to the bundled file
+       so the app always opens. */
+    win.webContents.once("did-fail-load", () => {
+      win.loadFile(path.join(APP_DIR, "index.html"));
+    });
   } else {
     win.loadFile(path.join(APP_DIR, "index.html"));
   }

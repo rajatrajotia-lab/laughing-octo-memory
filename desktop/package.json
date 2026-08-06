@@ -1,7 +1,7 @@
 {
   "name": "fuel-register",
   "productName": "Fuel Register",
-  "version": "1.2.11",
+  "version": "1.2.12",
   "description": "Diesel fuel tracking: logbook, purchases, stock register and reports.",
   "author": "Rajat Rajotia",
   "license": "UNLICENSED",
@@ -42,7 +42,7 @@
       "artifactName": "FuelRegister-Portable-${version}.${ext}"
     },
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["universal"] }],
+      "target": [{ "target": "zip", "arch": ["universal"] }],
       "icon": "build/icon.png",
       "category": "public.app-category.business",
       "artifactName": "FuelRegister-Mac-${version}.${ext}"
