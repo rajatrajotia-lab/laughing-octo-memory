@@ -468,7 +468,7 @@ const USAGE = ["Work oriented", "Ancillary", "Camp establishment"];
 const usageOf = m => m && USAGE.includes(m.usage) ? m.usage : "";
 const ownerOf = m => m && m.ownership === "Hired" ? "Hired" : "Own";
 const fuelOf = m => m && m.fuel === "Petrol" ? "Petrol" : "HSD";
-const CATEGORIES = ["Excavator", "Backhoe Loader", "Tipper", "Transit Mixer", "Trailer", "Tractor", "Hydra / Crane", "Dozer", "Vibratory Roller", "Batching Plant", "DG Set", "Dewatering Pump", "Air Compressor", "Concrete Pump", "Piling Rig", "Water Tanker", "Motorcycle", "Other"];
+const CATEGORIES = ["Excavator", "Backhoe Loader", "Tipper", "Transit Mixer", "Trailer", "Tractor", "Hydra / Crane", "Dozer", "Vibratory Roller", "Batching Plant", "DG Set", "Dewatering Pump", "Air Compressor", "Concrete Pump", "Piling Rig", "Water Tanker", "Motorcycle", "Subcontractor", "Other"];
 const blankEntry = () => ({
   date: today(),
   source: "Site tank",
@@ -1947,7 +1947,7 @@ function DieselLogbook() {
   }, "Purchases"), React.createElement("button", {
     className: view === "norms" ? "on" : "",
     onClick: () => setView("norms")
-  }, "Equipment"), React.createElement("button", {
+  }, "Fuel Users"), React.createElement("button", {
     className: view === "reports" ? "on" : "",
     onClick: () => setView("reports")
   }, "Reports")), view === "site" && React.createElement(React.Fragment, null, React.createElement("label", {
@@ -2039,7 +2039,7 @@ function DieselLogbook() {
         body: `Move ${name} to ${toName}, effective today? Fuel already drawn stays on the old site's registers.`,
         label: "Move machine",
         danger: false,
-        run: () => transferMachine(mId, toId, today(), "moved from equipment master")
+        run: () => transferMachine(mId, toId, today(), "moved from fuel user master")
       });
     },
     onOpen: (sid, mid) => {
@@ -2081,9 +2081,9 @@ function DieselLogbook() {
     className: isEquip ? "on" : "",
     onClick: () => setMachineId(machines.length ? machines[0].id : null),
     disabled: machines.length === 0
-  }, "Equipment")), isEquip && React.createElement("label", {
+  }, "Fuel users")), isEquip && React.createElement("label", {
     className: "dl-field dl-inline dl-equipsel"
-  }, React.createElement("span", null, "Equipment"), React.createElement("select", {
+  }, React.createElement("span", null, "Fuel user"), React.createElement("select", {
     value: machineId,
     onChange: e => setMachineId(e.target.value)
   }, equipGroups.map(g => React.createElement("optgroup", {
@@ -2099,7 +2099,7 @@ function DieselLogbook() {
   }, stockFuel, " in hand ", React.createElement("b", null, fmt(stockInHand, 1), " L")), React.createElement("button", {
     className: "dl-btn ghost",
     onClick: () => setDialog("machine")
-  }, "+ Equipment"))), machineId === null ? React.createElement("section", {
+  }, "+ Fuel user"))), machineId === null ? React.createElement("section", {
     className: "dl-panel"
   }, React.createElement("div", {
     className: "dl-panelhead"
@@ -2134,7 +2134,7 @@ function DieselLogbook() {
     alert: siteRoll.some(r => r.status === "over")
   })), machines.length === 0 ? React.createElement("p", {
     className: "dl-hint"
-  }, "No machines on this site yet. Add the first one to open its logbook.") : React.createElement("div", {
+  }, "No machines or subcontractors on this site yet. Add the first fuel user to open its logbook.") : React.createElement("div", {
     className: "dl-tablewrap"
   }, React.createElement("table", {
     className: "dl-table"
@@ -3359,7 +3359,7 @@ function Dashboard({
     value: "run"
   }, "Most running"), React.createElement("option", {
     value: "name"
-  }, "Machine name")))), React.createElement("div", {
+  }, "Name")))), React.createElement("div", {
     className: "dl-tablewrap"
   }, React.createElement("table", {
     className: "dl-table"
@@ -3722,7 +3722,7 @@ function NormMaster({
     className: "dl-panel"
   }, React.createElement("div", {
     className: "dl-panelhead"
-  }, React.createElement("div", null, React.createElement("h2", null, "Equipment master"), React.createElement("p", null, "Names, registration numbers, types and standards for every machine. ", set.size, " of", " ", all.length, " standards set", month === "all" ? "" : ` · actuals from ${monthLabel(month)}`)), React.createElement("button", {
+  }, React.createElement("div", null, React.createElement("h2", null, "Fuel user master"), React.createElement("p", null, "Names, registration numbers, types and standards for every machine. ", set.size, " of", " ", all.length, " standards set", month === "all" ? "" : ` · actuals from ${monthLabel(month)}`)), React.createElement("button", {
     className: "dl-btn ghost",
     onClick: applyAllSuggested
   }, "Fill blanks from actuals")), (unclassified > 0 || rentMissing > 0 || noUsage > 0) && React.createElement("div", {
@@ -3785,7 +3785,7 @@ function NormMaster({
     value: "site"
   }, "Site"), React.createElement("option", {
     value: "name"
-  }, "Machine name"), React.createElement("option", {
+  }, "Name"), React.createElement("option", {
     value: "type"
   }, "Type"), React.createElement("option", {
     value: "own"
@@ -4682,15 +4682,15 @@ function MachineDialog({
     onClose();
   };
   return React.createElement(Modal, {
-    title: initial ? "Edit machine" : "New machine",
+    title: initial ? "Edit fuel user" : "New fuel user",
     onClose: onClose
   }, React.createElement(F, {
-    label: "Machine name"
+    label: "Name — machine or subcontractor"
   }, React.createElement("input", {
     autoFocus: true,
     value: m.name,
     onChange: e => set("name", e.target.value),
-    placeholder: "e.g. Tata Hitachi EX210"
+    placeholder: "e.g. Tata Hitachi EX210, or M/s Sharma Constructions"
   })), React.createElement(F, {
     label: "Code / registration no."
   }, React.createElement("input", {
