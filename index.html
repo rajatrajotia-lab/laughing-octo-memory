@@ -1138,6 +1138,27 @@ function DieselLogbook() {
     const t = setTimeout(() => setNote(""), 3000);
     return () => clearTimeout(t);
   }, [note]);
+  const saveNow = async () => {
+    clearTimeout(saveTimer.current);
+    setSaveState("saving");
+    try {
+      await window.storage.set(STORE_KEY, JSON.stringify(data));
+      setSaveState("saved");
+      setSavedAt(new Date());
+      return true;
+    } catch (e) {
+      setSaveState("error");
+      setNote("Could not save to this device — export a copy before closing.");
+      return false;
+    }
+  };
+  const refreshNow = async () => {
+    if (saveState !== "saved") {
+      const ok = await saveNow();
+      if (!ok) return;
+    }
+    location.reload();
+  };
   const scope = deviceScope(data);
   const visibleSites = scope ? data.sites.filter(x => x.id === scope) : data.sites;
   const site = (scope ? visibleSites.find(s => s.id === scope) : data.sites.find(s => s.id === siteId)) || null;
@@ -1984,15 +2005,26 @@ function DieselLogbook() {
   }, React.createElement("span", {
     className: "dl-lockicon",
     "aria-hidden": "true"
-  }), locked ? "Locked" : "Management"), React.createElement("span", {
+  }), locked ? "Locked" : "Management"), React.createElement("button", {
     className: "dl-save " + saveState,
-    title: saveState === "error" ? "This device is not accepting saved data" : savedAt ? "Last saved " + savedAt.toLocaleTimeString() : "Saved on this device"
+    style: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      font: "inherit"
+    },
+    onClick: saveNow,
+    title: saveState === "error" ? "This device is not accepting saved data — click to retry" : "Click to save now" + (savedAt ? " · last saved " + savedAt.toLocaleTimeString() : "")
   }, React.createElement("span", {
     className: "dl-savedot"
   }), saveState === "error" ? "Not saved" : saveState === "saved" ? savedAt ? "Saved " + savedAt.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit"
   }) : "Saved" : "Saving…"), React.createElement("button", {
+    className: "dl-btn ghost",
+    title: "Save, then pull the latest records — useful when several machines share this register",
+    onClick: refreshNow
+  }, "\u21bb Refresh"), React.createElement("button", {
     className: "dl-alertbtn" + (critical ? " critical" : warnings ? " warn" : " clear"),
     onClick: () => setDialog("alerts")
   }, React.createElement("span", {
