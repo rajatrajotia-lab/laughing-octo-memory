@@ -2125,7 +2125,7 @@ function DieselLogbook() {
     value: rates.HSD || rates.Petrol ? "₹ " + fmt(siteRoll.reduce((a, b) => a + b.litres * (rates[fuelOf(b.m)] || 0), 0), 0) : "—",
     unit: rates.HSD || rates.Petrol ? `at this site's own rates${rates.HSD ? ` · HSD ₹${fmt(rates.HSD, 2)}` : ""}${rates.Petrol ? ` · Petrol ₹${fmt(rates.Petrol, 2)}` : ""}` : "no rate entered on any receipt"
   }), React.createElement(Kpi, {
-    label: "Plant cost",
+    label: "Equipment cost",
     value: "₹ " + fmt(machines.reduce((a, m) => a + (ownerOf(m) === "Hired" ? rentFor(m, month === "all" ? null : month) : num(m.ownCost)), 0), 0),
     unit: `per month · ${machines.filter(m => ownerOf(m) === "Hired").length} hired + ${machines.filter(m => ownerOf(m) !== "Hired" && num(m.ownCost) > 0).length} own costed`
   }), React.createElement(Kpi, {
@@ -2705,6 +2705,7 @@ function Dashboard({
   const [fuel, setFuel] = useState("HSD");
   const [drill, setDrill] = useState(null);
   const [dayDrill, setDayDrill] = useState(null);
+  const [tab, setTab] = useState("overview");
   const sites = overview.map(s => {
     const rows = s.rows.filter(r => r.fuel === fuel);
     const st = s.fuelStock && s.fuelStock[fuel] || {};
@@ -2920,6 +2921,18 @@ function Dashboard({
   }), React.createElement("div", null, React.createElement("strong", null, alerts.filter(a => a.level === "critical").length, " matter", alerts.filter(a => a.level === "critical").length === 1 ? "" : "s", " needing attention"), React.createElement("em", null, alerts.filter(a => a.level === "critical").slice(0, 2).map(a => `${a.site.nick || a.site.name}: ${a.title.toLowerCase()}`).join(" · "), alerts.filter(a => a.level === "critical").length > 2 ? " · and more" : "")), React.createElement("span", {
     className: "dl-alertgo"
   }, "view all →")), React.createElement("div", {
+    className: "dl-switch",
+    style: {
+      marginBottom: 18,
+      display: "inline-flex"
+    }
+  }, React.createElement("button", {
+    className: tab === "overview" ? "on" : "",
+    onClick: () => setTab("overview")
+  }, "Overview"), React.createElement("button", {
+    className: tab === "machines" ? "on" : "",
+    onClick: () => setTab("machines")
+  }, "Machine-wise distribution")), tab === "overview" && React.createElement("div", {
     className: "dl-kpis"
   }, React.createElement(Kpi, {
     label: `${fuel} purchased`,
@@ -2949,9 +2962,9 @@ function Dashboard({
     unit: `litres of ${fmt(consumed, 0)} consumed`,
     alert: excess > 0,
     onClick: () => setDrill("over")
-  })), React.createElement("p", {
+  })), tab === "overview" && React.createElement("p", {
     className: "dl-legend"
-  }, "Every figure above opens its detail — click a card. ", entries, " entries in this period."), React.createElement("div", {
+  }, "Every figure above opens its detail — click a card. ", entries, " entries in this period."), tab === "overview" && React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
@@ -2983,7 +2996,7 @@ function Dashboard({
     className: "dl-sub2"
   }, Object.values(dy.sites).map(c => c.site.nick || c.site.name).join(", "))))))), React.createElement("p", {
     className: "dl-legend"
-  }, "One row per day across the whole company. Click a row for that day's site-wise and machine-wise break-up, including how much came from the site tank against direct from the pump.")), React.createElement("div", {
+  }, "One row per day across the whole company. Click a row for that day's site-wise and machine-wise break-up, including how much came from the site tank against direct from the pump.")), tab === "overview" && React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
@@ -3075,55 +3088,7 @@ function Dashboard({
     colSpan: 2
   }))))), React.createElement("p", {
     className: "dl-legend"
-  }, "Figures are for one month at a time. Choosing “All” in the month filter breaks each site out month by month rather than lumping them together. Daily averages are over days a fuel report was actually raised, not calendar days — so a site reporting five days out of thirty is not made to look thrifty. Days cover is stock in hand divided by that site’s daily burn.")), React.createElement("div", {
-    className: "dl-block"
-  }, React.createElement("h3", {
-    className: "dl-blockhead"
-  }, "Machines failing the standard"), overStd.length === 0 ? React.createElement("p", {
-    className: "dl-hint"
-  }, rated.length === 0 ? "No standard has been set on any machine yet, so nothing can be assessed. Set them under Equipment." : `All ${rated.length} machines with a standard are within it.`) : React.createElement("div", {
-    className: "dl-tablewrap"
-  }, React.createElement("table", {
-    className: "dl-table"
-  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Machine"), React.createElement("th", null, "Site"), React.createElement("th", null, "Owned / hired"), React.createElement("th", {
-    className: "r"
-  }, "Actual"), React.createElement("th", {
-    className: "r"
-  }, "Standard"), React.createElement("th", {
-    className: "r"
-  }, "Variance"), React.createElement("th", {
-    className: "r"
-  }, "Excess"), React.createElement("th", {
-    className: "r"
-  }, "Fuel drawn"))), React.createElement("tbody", null, overStd.slice().sort((a, b) => b.variance - a.variance).map(r => React.createElement("tr", {
-    key: (r.site ? r.site.id + ":" : "") + r.m.id,
-    className: "click",
-    onClick: () => onOpen(r.site.id, r.m.id)
-  }, React.createElement("td", null, React.createElement("strong", null, r.m.name), React.createElement("span", {
-    className: "dl-sub"
-  }, r.m.category, r.m.code ? ` · ${r.m.code}` : "")), React.createElement("td", {
-    className: "dl-sub2"
-  }, r.site.nick || r.site.name), React.createElement("td", null, React.createElement("span", {
-    className: "dl-own " + r.own.toLowerCase()
-  }, r.own)), React.createElement("td", {
-    className: "r mono flag over"
-  }, fmt(r.eff), " ", React.createElement("span", {
-    className: "dl-u"
-  }, r.m.meterType === "hours" ? "L/hr" : "km/L")), React.createElement("td", {
-    className: "r mono"
-  }, r.m.norm), React.createElement("td", {
-    className: "r mono flag over"
-  }, "+", fmt(r.variance, 1), "%"), React.createElement("td", {
-    className: "r mono"
-  }, fmt(r.litres * (r.variance / (100 + r.variance)), 1), " L"), React.createElement("td", {
-    className: "r mono"
-  }, fmt(r.litres, 1), " L")))), React.createElement("tfoot", null, React.createElement("tr", null, React.createElement("td", {
-    colSpan: 6
-  }, "Excess against standard"), React.createElement("td", {
-    className: "r mono"
-  }, fmt(excess, 1), " L"), React.createElement("td", null))))), rated.length < allRows.length && React.createElement("p", {
-    className: "dl-legend"
-  }, allRows.length - rated.length, " machine", allRows.length - rated.length === 1 ? " has" : "s have", " no standard set and", " ", allRows.length - rated.length === 1 ? "is" : "are", " not assessed here.")), React.createElement("div", {
+  }, "Figures are for one month at a time. Choosing “All” in the month filter breaks each site out month by month rather than lumping them together. Daily averages are over days a fuel report was actually raised, not calendar days — so a site reporting five days out of thirty is not made to look thrifty. Days cover is stock in hand divided by that site’s daily burn.")), tab === "machines" && React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
@@ -3155,7 +3120,7 @@ function Dashboard({
     }, pct(r.litres, s.litres)))));
   })), React.createElement("p", {
     className: "dl-legend"
-  }, "Bar colour follows the machine’s standing against its standard, so a long red bar is a heavy machine that is also inefficient — the first place to look.")), React.createElement(Guard, {
+  }, "Bar colour follows the machine’s standing against its standard, so a long red bar is a heavy machine that is also inefficient — the first place to look.")), tab === "overview" && React.createElement(Guard, {
     label: "The charts could not be drawn"
   }, React.createElement("div", {
     className: "dl-charts"
@@ -3230,11 +3195,11 @@ function Dashboard({
     wrapperStyle: LEG
   }))), React.createElement("p", {
     className: "dl-legend"
-  }, "Work-oriented burn earns money; ancillary and camp are overheads. A growing overhead share is the thing to catch early.")))), React.createElement("div", {
+  }, "Work-oriented burn earns money; ancillary and camp are overheads. A growing overhead share is the thing to catch early.")))), tab === "overview" && React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
-  }, "Plant cost — monthly commitment"), React.createElement("div", {
+  }, "Equipment cost — monthly commitment"), React.createElement("div", {
     className: "dl-kpis"
   }, React.createElement(Kpi, {
     label: "Hired machines",
@@ -3247,7 +3212,7 @@ function Dashboard({
     unit: `per month · ${plantOwn} machine${plantOwn === 1 ? "" : "s"} costed`,
     onClick: () => setDrill("rent")
   }), React.createElement(Kpi, {
-    label: "Total plant cost",
+    label: "Total equipment cost",
     value: "₹ " + fmt(plantTotal, 0),
     unit: "per month · click for site-wise detail",
     onClick: () => setDrill("rent")
@@ -3298,7 +3263,7 @@ function Dashboard({
     maxBarSize: 60
   })))), React.createElement("p", {
     className: "dl-legend"
-  }, "Kept apart from the fuel figures above. Hired is the committed hire per month at current rates; Own is the owning cost entered against own machines. Click any card for the site-wise and machine-wise break-up.")), React.createElement("div", {
+  }, "Kept apart from the fuel figures above. Hired is the committed hire per month at current rates; Own is the owning cost entered against own machines. Click any card for the site-wise and machine-wise break-up.")), tab === "overview" && React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
@@ -3326,86 +3291,7 @@ function Dashboard({
   }, s.last || "—"))), React.createElement("button", {
     className: "dl-link",
     onClick: () => onOpen(s.site.id, null)
-  }, "open site dashboard →"))))), React.createElement("div", {
-    className: "dl-block"
-  }, React.createElement("div", {
-    className: "dl-blockrow"
-  }, React.createElement("h3", {
-    className: "dl-blockhead"
-  }, "Machine averages"), React.createElement("label", {
-    className: "dl-field dl-inline"
-  }, React.createElement("span", null, "Sort by"), React.createElement("select", {
-    value: sortBy,
-    onChange: e => setSortBy(e.target.value)
-  }, React.createElement("option", {
-    value: "variance"
-  }, "Worst against standard"), React.createElement("option", {
-    value: "litres"
-  }, "Most fuel"), React.createElement("option", {
-    value: "run"
-  }, "Most running"), React.createElement("option", {
-    value: "name"
-  }, "Name")))), React.createElement("div", {
-    className: "dl-tablewrap"
-  }, React.createElement("table", {
-    className: "dl-table"
-  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Machine"), React.createElement("th", null, "Site"), React.createElement("th", null, "Owned / hired"), React.createElement("th", {
-    className: "r"
-  }, "Days"), React.createElement("th", {
-    className: "r"
-  }, "Total run"), React.createElement("th", {
-    className: "r"
-  }, "Avg run/day"), React.createElement("th", {
-    className: "r"
-  }, "Down hrs"), React.createElement("th", {
-    className: "r"
-  }, "Avg fuel/day"), React.createElement("th", {
-    className: "r"
-  }, "Avg consumption"), React.createElement("th", {
-    className: "r"
-  }, "Standard"), React.createElement("th", {
-    className: "r"
-  }, "Variance"), React.createElement("th", null, "Last entry"))), React.createElement("tbody", null, sorted.map(r => {
-    const u = r.m.meterType === "hours" ? "hrs" : "km";
-    const eu = r.m.meterType === "hours" ? "L/hr" : "km/L";
-    return React.createElement("tr", {
-      key: (r.site ? r.site.id + ":" : "") + r.m.id,
-      className: "click",
-      onClick: () => onOpen(r.site.id, r.m.id)
-    }, React.createElement("td", null, React.createElement("strong", null, r.m.name), React.createElement("span", {
-      className: "dl-sub"
-    }, r.m.category, r.m.code ? ` · ${r.m.code}` : "")), React.createElement("td", {
-      className: "dl-sub2"
-    }, r.site.name), React.createElement("td", null, React.createElement("span", {
-      className: "dl-own " + r.own.toLowerCase()
-    }, r.own), r.own === "Hired" && r.m.owner && React.createElement("span", {
-      className: "dl-sub"
-    }, r.m.owner)), React.createElement("td", {
-      className: "r mono"
-    }, r.days || "—"), React.createElement("td", {
-      className: "r mono"
-    }, fmt(r.run, 1), " ", React.createElement("span", {
-      className: "dl-u"
-    }, u)), React.createElement("td", {
-      className: "r mono"
-    }, r.avgRun === null ? "—" : fmt(r.avgRun, 1)), React.createElement("td", {
-      className: "r mono" + (r.bdHrs ? " flag over" : "")
-    }, r.downHrs ? fmt(r.downHrs, 1) : "—"), React.createElement("td", {
-      className: "r mono"
-    }, r.avgLitres === null ? "—" : fmt(r.avgLitres, 1)), React.createElement("td", {
-      className: "r mono flag " + r.status
-    }, r.eff === null ? "—" : fmt(r.eff), " ", React.createElement("span", {
-      className: "dl-u"
-    }, eu)), React.createElement("td", {
-      className: "r mono"
-    }, r.m.norm || "—"), React.createElement("td", {
-      className: "r mono flag " + r.status
-    }, r.variance === null ? "—" : `${r.variance >= 0 ? "+" : ""}${fmt(r.variance, 1)}%`), React.createElement("td", {
-      className: "mono dl-sub2"
-    }, r.last || "no entries"));
-  })))), React.createElement("p", {
-    className: "dl-legend"
-  }, "Consumption is measured fill to fill, not shift to shift: fuel goes into a tank and may run the machine for several shifts, so a shift with no issue reads “on tank” rather than zero. Averages are per logged day, not per calendar day. Variance compares actual consumption with the standard set for that machine — positive means it is burning more than it should. Machine-level figures are tracked by volume; values appear only at site and head-office level.")), dayDrill && React.createElement(Modal, {
+  }, "open site dashboard →"))))), dayDrill && React.createElement(Modal, {
     title: "Day detail — " + dayDrill.date,
     onClose: () => setDayDrill(null),
     wide: true
@@ -3472,7 +3358,7 @@ function DrillDown({
     consumed: `${fuel} consumed — site and machine detail`,
     stock: `${fuel} stock in hand — site detail`,
     over: "Machines above standard",
-    rent: "Plant cost — monthly commitment, site-wise"
+    rent: "Equipment cost — monthly commitment, site-wise"
   };
   let body = null;
   if (which === "purchased") {
