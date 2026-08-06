@@ -1,7 +1,7 @@
 {
   "name": "fuel-register",
   "productName": "Fuel Register",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Diesel fuel tracking: logbook, purchases, stock register and reports.",
   "author": "Rajat Rajotia",
   "license": "UNLICENSED",
