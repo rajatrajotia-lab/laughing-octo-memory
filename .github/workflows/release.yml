@@ -18,7 +18,9 @@ jobs:
           node-version: 20
       - name: Bundle app into desktop wrapper
         shell: bash
-        run: mkdir -p desktop/app && cp index.html desktop/app/index.html
+        run: |
+          mkdir -p desktop/app
+          cp index.html manifest.webmanifest icon-192.png icon-512.png icon-512-maskable.png apple-touch-icon.png desktop/app/
       - name: Install dependencies
         working-directory: desktop
         run: npm install
@@ -42,7 +44,9 @@ jobs:
         with:
           node-version: 20
       - name: Bundle app into desktop wrapper
-        run: mkdir -p desktop/app && cp index.html desktop/app/index.html
+        run: |
+          mkdir -p desktop/app
+          cp index.html manifest.webmanifest icon-192.png icon-512.png icon-512-maskable.png apple-touch-icon.png desktop/app/
       - name: Install dependencies
         working-directory: desktop
         run: npm install
@@ -70,41 +74,56 @@ jobs:
         run: gradle assembleRelease
       - name: Align and sign APK
         run: |
+          VERSION=$(node -p "require('./desktop/package.json').version")
           BT=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)
           "$ANDROID_HOME/build-tools/$BT/zipalign" -f 4 \
             android/app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
           "$ANDROID_HOME/build-tools/$BT/apksigner" sign \
             --ks android/signing.p12 --ks-pass pass:fuelregister \
-            --out FuelRegister-1.0.0.apk aligned.apk
+            --out "FuelRegister-$VERSION.apk" aligned.apk
       - uses: actions/upload-artifact@v4
         with:
           name: android
-          path: FuelRegister-1.0.0.apk
+          path: FuelRegister-*.apk
 
   release:
     needs: [windows, mac, android]
     if: always() && needs.windows.result == 'success' && needs.mac.result == 'success'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - name: Read version
+        id: v
+        run: echo "version=$(node -p "require('./desktop/package.json').version")" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
           path: files
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0
-          name: Fuel Register 1.0.0
+          tag_name: v${{ steps.v.outputs.version }}
+          name: Fuel Register ${{ steps.v.outputs.version }}
           body: |
             ## Fuel Register — downloads
 
             | Device | File to download | How to install |
             |---|---|---|
-            | Windows PC | `FuelRegister-Setup-1.0.0.exe` | Double-click. If Windows shows a blue "protected your PC" screen, click **More info → Run anyway** (the app is unsigned, not harmful). |
-            | Windows (no install) | `FuelRegister-Portable-1.0.0.exe` | Runs directly without installing — handy for USB drives. |
-            | Mac | `FuelRegister-Mac-1.0.0.dmg` | Open the dmg, drag Fuel Register to Applications. First launch: **right-click the app → Open → Open**. |
-            | Android phone | `FuelRegister-1.0.0.apk` | Open the file on the phone and allow "install from unknown sources" when prompted. |
+            | Windows PC | `FuelRegister-Setup-${{ steps.v.outputs.version }}.exe` | Double-click. If Windows shows a blue "protected your PC" screen, click **More info → Run anyway** (the app is unsigned, not harmful). |
+            | Windows (no install) | `FuelRegister-Portable-${{ steps.v.outputs.version }}.exe` | Runs directly without installing — handy for USB drives. |
+            | Mac | `FuelRegister-Mac-${{ steps.v.outputs.version }}.dmg` | Open the dmg, drag Fuel Register to Applications. First launch: **right-click the app → Open → Open**. |
+            | Android phone | `FuelRegister-${{ steps.v.outputs.version }}.apk` | Open the file on the phone and allow "install from unknown sources" when prompted. Installs over older versions; your entries are kept. |
 
-            The app works fully offline. Entries are saved on each device; use the app's Data Transfer screen to move records between devices.
+            ### Share data on the same WiFi (new in 1.1.0)
+            The Windows/Mac app now acts as a data hub. Start it on your main computer and a
+            bar at the bottom shows an address like `http://192.168.1.5:8785` — open that
+            address in a browser on any phone or computer **on the same WiFi** to see and
+            enter the same live data. (If Windows asks for network permission on first
+            launch, click **Allow**.)
 
-            You can also use it without installing anything at https://rajatrajotia-lab.github.io/laughing-octo-memory/
+            The app works fully offline; WiFi sharing is optional. Entries made in the
+            desktop app are saved on that computer; standalone phone installs keep their
+            own data — use the app's Data Transfer screen to move records across.
+
+            You can also use the app without installing anything at
+            https://rajatrajotia-lab.github.io/laughing-octo-memory/
           files: files/*
