@@ -1594,8 +1594,7 @@ function DieselLogbook() {
     if (isLocked(data, site.id, form.date)) return setNote(`${monthLabel(form.date.slice(0, 7))} is locked for this site.`);
     const sh = shiftOf(form);
     const sameDay = (data.logs[machine.id] || []).filter(e => e.date === form.date && e.id !== editId);
-    if (sh === "Full" && sameDay.length > 0) return setNote(`${machine.name} already has an entry for ${form.date}. A full-day entry has to be the only one for its date — edit the existing entry, or switch this one to a shift.`);
-    if (sh !== "Full" && sameDay.some(e => shiftOf(e) === "Full")) return setNote(`${form.date} already has a full-day entry for ${machine.name}. Edit that entry, or delete it to switch to shift-wise entries.`);
+    if (sameDay.length > 0) return setNote(`${machine.name} already has an entry for ${form.date} — one entry covers the whole day. Edit the existing entry instead.`);
     const clash = sameDay.find(e => shiftOf(e) === sh);
     if (clash) return setNote(`${machine.name} already has a ${sh.toLowerCase()} shift entry for ${form.date}` + `${clash.origin === "stock" ? ", raised from that day's fuel report" : ""}. ` + `Edit it rather than adding another.`);
     if (sameDay.length >= SHIFTS.length) return setNote(`${machine.name} already has both shifts entered for ${form.date}. A day takes two entries at most.`);
@@ -2442,21 +2441,6 @@ function DieselLogbook() {
       date: e.target.value
     })
   })), React.createElement(F, {
-    label: "Entry covers",
-    accent: true
-  }, React.createElement("select", {
-    value: shiftOf(form),
-    onChange: e => setForm({
-      ...form,
-      shift: e.target.value
-    })
-  }, React.createElement("option", {
-    value: "Full"
-  }, "Full day (up to 24 hrs)"), React.createElement("option", {
-    value: "Day"
-  }, "Day shift"), React.createElement("option", {
-    value: "Night"
-  }, "Night shift"))), React.createElement(F, {
     label: "Slip no."
   }, React.createElement("input", {
     value: form.slip,
@@ -2596,7 +2580,7 @@ function DieselLogbook() {
       className: "strong"
     }, r.eff === null ? "—" : fmt(r.eff), " ", unit), machine.meterType !== "km" && used > 0 && React.createElement("span", {
       className: used > cap ? "flag over" : ""
-    }, fmt(used, 1), " of ", cap, " hrs", shiftOf(form) === "Full" ? " in the day" : ` in the ${shiftOf(form).toLowerCase()} shift`));
+    }, fmt(used, 1), " of ", cap, " hrs in the day"));
   })()), React.createElement("button", {
     className: "dl-btn",
     onClick: saveEntry
