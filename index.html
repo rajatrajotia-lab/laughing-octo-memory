@@ -1781,6 +1781,10 @@ function DieselLogbook() {
       at: new Date().toISOString()
     };
   });
+  const chainShort = (list, siteObj, f) => {
+    const rows = buildStock(list, siteFleet(data, siteObj), f).slice().reverse();
+    return rows.find(r => r.closing < -0.001) || null;
+  };
   const savePurchase = rec => {
     const f = rec.fuel || "HSD";
     if (!rec.siteId) return setNote("Choose the site the fuel went to.");
@@ -1796,6 +1800,34 @@ function DieselLogbook() {
         };
       }));
       if (src && isLocked(data, src.sid, src.date)) return setNote(`${monthLabel(src.date.slice(0, 7))} is locked for the site this receipt is currently on.`);
+    }
+    {
+      const trial = JSON.parse(JSON.stringify(data.stock[rec.siteId] || []));
+      trial.forEach(day => {
+        const j = (day.receipts || []).findIndex(x => x.id === rec.id);
+        if (j >= 0 && !(day.date === rec.date && (day.fuel || "HSD") === f)) day.receipts.splice(j, 1);
+      });
+      let day = trial.find(x => x.date === rec.date && (x.fuel || "HSD") === f);
+      if (!day) {
+        day = {
+          ...blankStock(f),
+          id: "__trial__",
+          date: rec.date,
+          fuel: f
+        };
+        trial.push(day);
+      }
+      day.receipts = Array.isArray(day.receipts) ? day.receipts.slice() : [];
+      const j = day.receipts.findIndex(x => x.id === rec.id);
+      const body = {
+        id: rec.id || "__new__",
+        qty: num(rec.qty),
+        rate: rec.rate || ""
+      };
+      if (j >= 0) day.receipts[j] = body;else day.receipts.push(body);
+      const siteObj = data.sites.find(x => x.id === rec.siteId);
+      const short = siteObj && chainShort(trial, siteObj, f);
+      if (short) return setNote(`This change would leave the register short on ${short.e.date}: issues that day exceed the stock available (closing would be ${fmt(short.closing, 1)} L). Correct the later days first.`);
     }
     update(d => {
       if (rec.id) {
@@ -1838,7 +1870,15 @@ function DieselLogbook() {
     });
     setNote(rec.id ? "Receipt updated." : "Receipt recorded.");
   };
-  const deletePurchase = (siteId, dayId, rcptId) => setAsk({
+  const deletePurchase = (siteId, dayId, rcptId) => {
+    const trial = JSON.parse(JSON.stringify(data.stock[siteId] || []));
+    const tday = trial.find(x => x.id === dayId);
+    if (tday) tday.receipts = (tday.receipts || []).filter(r => r.id !== rcptId);
+    const siteObj = data.sites.find(x => x.id === siteId);
+    const f = tday && (tday.fuel || "HSD") || "HSD";
+    const short = siteObj && chainShort(trial, siteObj, f);
+    if (short) return setNote(`Cannot delete this receipt: on ${short.e.date} the fuel already issued would exceed the remaining stock (closing would be ${fmt(short.closing, 1)} L). Remove or correct those issues first.`);
+    setAsk({
     title: "Delete receipt",
     body: "This removes the receipt from that day. The site's closing balance changes with it.",
     label: "Delete receipt",
@@ -1850,7 +1890,8 @@ function DieselLogbook() {
       const empty = day.receipts.length === 0 && Object.values(day.issues || {}).every(q => !num(q)) && !num(day.otherQty) && (day.physical === "" || day.physical === null || day.physical === undefined) && !(day.remarks || "").trim();
       if (empty) d.stock[siteId] = d.stock[siteId].filter(x => x.id !== day.id);
     })
-  });
+    });
+  };
   const saveStock = (entry, editingId) => {
     if (!site) return;
     const f = entry.fuel || "HSD";
@@ -1917,6 +1958,10 @@ function DieselLogbook() {
     });
   };
   const doDeleteStock = rec => {
+    const f0 = rec.fuel || "HSD";
+    const trial = (data.stock[site.id] || []).filter(x => x.id !== rec.id);
+    const short = chainShort(JSON.parse(JSON.stringify(trial)), site, f0);
+    if (short) return setNote(`Cannot delete this report: without it, ${short.e.date} would issue more than the stock available (closing would be ${fmt(short.closing, 1)} L). Correct the later days first.`);
     update(d => {
       d.stock[site.id] = (d.stock[site.id] || []).filter(x => x.id !== rec.id);
       const f = rec.fuel || "HSD";
