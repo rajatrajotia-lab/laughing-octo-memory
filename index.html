@@ -443,6 +443,7 @@ const monthLabel = k => {
   const [y, m] = k.split("-");
   return `${MONTHS[parseInt(m, 10) - 1]} ${y.slice(2)}`;
 };
+const dayLabel = d => `${parseInt(d.slice(8, 10), 10)} ${MONTHS[parseInt(d.slice(5, 7), 10) - 1]}`;
 const SERIES = ["#C86A15", "#0C2B25", "#3A6EA5", "#1D7A5B", "#8E5A9B", "#8A4E0B", "#5C8F7E", "#C0392B"];
 const C_OK = "#1D7A5B";
 const C_WATCH = "#C98209";
@@ -2870,8 +2871,8 @@ function Dashboard({
   const [sortBy, setSortBy] = useState("variance");
   const [fuel, setFuel] = useState("HSD");
   const [drill, setDrill] = useState(null);
-  const [dayDrill, setDayDrill] = useState(null);
   const [tab, setTab] = useState("overview");
+  const [snapDate, setSnapDate] = useState(null);
   const sites = overview.map(s => {
     const rows = s.rows.filter(r => r.fuel === fuel);
     const st = s.fuelStock && s.fuelStock[fuel] || {};
@@ -3095,10 +3096,13 @@ function Dashboard({
   }, React.createElement("button", {
     className: tab === "overview" ? "on" : "",
     onClick: () => setTab("overview")
-  }, "Overview"), React.createElement("button", {
+  }, "Overview — all sites"), React.createElement("button", {
+    className: tab === "sitewise" ? "on" : "",
+    onClick: () => setTab("sitewise")
+  }, "Site-wise"), React.createElement("button", {
     className: tab === "machines" ? "on" : "",
     onClick: () => setTab("machines")
-  }, "Machine-wise distribution")), tab === "overview" && React.createElement("div", {
+  }, "Machine-wise")), tab === "overview" && React.createElement("div", {
     className: "dl-kpis"
   }, React.createElement(Kpi, {
     label: `${fuel} purchased`,
@@ -3136,37 +3140,69 @@ function Dashboard({
     className: "dl-blockhead"
   }, "Daily snapshot — ", fuel, month === "all" ? " · last 31 active days" : " · " + monthLabel(month)), daily.length === 0 ? React.createElement("p", {
     className: "dl-hint"
-  }, "No activity in this period yet.") : React.createElement("div", {
-    className: "dl-tablewrap"
-  }, React.createElement("table", {
-    className: "dl-table"
-  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Date"), React.createElement("th", {
-    className: "r"
-  }, "Opening stock"), React.createElement("th", {
-    className: "r"
-  }, "Purchased"), React.createElement("th", {
-    className: "r"
-  }, "Consumed"), React.createElement("th", {
-    className: "r"
-  }, "Closing stock"), React.createElement("th", null, "Sites"))), React.createElement("tbody", null, daily.map(dy => React.createElement("tr", {
-    key: dy.date,
-    className: "click",
-    onClick: () => setDayDrill(dy)
-  }, React.createElement("td", {
-    className: "mono"
-  }, dy.date), React.createElement("td", {
-    className: "r mono"
-  }, dy.closing === null ? "—" : fmt(dy.closing - dy.received + dy.issued, 1)), React.createElement("td", {
-    className: "r mono"
-  }, fmt(dy.received, 1)), React.createElement("td", {
-    className: "r mono"
-  }, React.createElement("strong", null, fmt(dy.issued + dy.direct, 1))), React.createElement("td", {
-    className: "r mono"
-  }, dy.closing === null ? "—" : fmt(dy.closing, 1)), React.createElement("td", {
-    className: "dl-sub2"
-  }, Object.values(dy.sites).map(c => c.site.nick || c.site.name).join(", "))))))), React.createElement("p", {
+  }, "No activity in this period yet.") : (() => {
+    const sel = daily.find(x => x.date === snapDate) || daily[0];
+    const selOpening = sel.closing === null ? null : sel.closing - sel.received + sel.issued;
+    return React.createElement(React.Fragment, null, React.createElement("div", {
+      className: "dl-datetabs"
+    }, daily.map(dy => React.createElement("button", {
+      key: dy.date,
+      className: "dl-datetab" + (dy.date === sel.date ? " on" : ""),
+      onClick: () => setSnapDate(dy.date)
+    }, dayLabel(dy.date)))), React.createElement("div", {
+      className: "dl-kpis",
+      style: {
+        marginTop: 6
+      }
+    }, React.createElement(Kpi, {
+      label: "Opening stock",
+      value: selOpening === null ? "—" : fmt(selOpening, 1),
+      unit: "litres · " + sel.date
+    }), React.createElement(Kpi, {
+      label: "Purchased",
+      value: fmt(sel.received, 1),
+      unit: "litres"
+    }), React.createElement(Kpi, {
+      label: "Consumed",
+      value: fmt(sel.issued + sel.direct, 1),
+      unit: sel.direct > 0 ? `litres · ${fmt(sel.direct, 1)} L direct from pump` : "litres"
+    }), React.createElement(Kpi, {
+      label: "Closing stock",
+      value: sel.closing === null ? "—" : fmt(sel.closing, 1),
+      unit: "litres"
+    })), Object.values(sel.sites).map(c => React.createElement("div", {
+      key: c.site.id,
+      className: "dl-snapsite"
+    }, React.createElement("h4", {
+      className: "dl-drillsite"
+    }, c.site.nick || c.site.name, React.createElement("span", null, c.opening !== null ? `opening ${fmt(c.opening, 1)} + purchased ${fmt(c.received, 1)} − issued ${fmt(c.issued, 1)} = closing ${fmt(c.closing, 1)} L` : "no tank report this day")), c.issues.length === 0 && c.directRows.length === 0 ? React.createElement("p", {
+      className: "dl-hint"
+    }, "Purchases only — no fuel issued at this site this day.") : React.createElement("div", {
+      className: "dl-tablewrap"
+    }, React.createElement("table", {
+      className: "dl-table"
+    }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Fuel user"), React.createElement("th", null, "Source"), React.createElement("th", {
+      className: "r"
+    }, "Litres"))), React.createElement("tbody", null, c.issues.map((x, i) => React.createElement("tr", {
+      key: "t" + i,
+      className: x.id ? "click" : "",
+      onClick: x.id ? () => onOpen(c.site.id, x.id) : undefined
+    }, React.createElement("td", null, x.name), React.createElement("td", {
+      className: "dl-sub2"
+    }, "Site tank"), React.createElement("td", {
+      className: "r mono"
+    }, fmt(x.qty, 1)))), c.directRows.map((x, i) => React.createElement("tr", {
+      key: "d" + i,
+      className: "click",
+      onClick: () => onOpen(c.site.id, x.id)
+    }, React.createElement("td", null, x.name), React.createElement("td", {
+      className: "dl-sub2"
+    }, "Direct from pump"), React.createElement("td", {
+      className: "r mono"
+    }, fmt(x.qty, 1))))))))));
+  })(), React.createElement("p", {
     className: "dl-legend"
-  }, "Opening stock is the previous day's closing carried forward — opening + purchased − tank issues = closing. Fuel taken direct from the pump counts in Consumed but never touches the tank, so it does not move closing stock. Click a row for the day's break-up.")), tab === "overview" && React.createElement("div", {
+  }, "Pick a date to see that day's position across the company, site by site. Opening stock is the previous day's closing carried forward — opening + purchased − tank issues = closing. Fuel taken direct from the pump counts in Consumed but never touches the tank, so it does not move closing stock. Click a fuel user to open its logbook.")), tab === "sitewise" && React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
@@ -3439,7 +3475,7 @@ function Dashboard({
     maxBarSize: 60
   })))), React.createElement("p", {
     className: "dl-legend"
-  }, "Kept apart from the fuel figures above. Hired is the committed hire per month at current rates; Own is the owning cost entered against own machines. Click any card for the site-wise and machine-wise break-up.")), tab === "overview" && React.createElement("div", {
+  }, "Kept apart from the fuel figures above. Hired is the committed hire per month at current rates; Own is the owning cost entered against own machines. Click any card for the site-wise and machine-wise break-up.")), tab === "sitewise" && React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
@@ -3467,47 +3503,7 @@ function Dashboard({
   }, s.last || "—"))), React.createElement("button", {
     className: "dl-link",
     onClick: () => onOpen(s.site.id, null)
-  }, "open site dashboard →"))))), dayDrill && React.createElement(Modal, {
-    title: "Day detail — " + dayDrill.date,
-    onClose: () => setDayDrill(null),
-    wide: true
-  }, Object.values(dayDrill.sites).map(c => React.createElement("div", {
-    key: c.site.id,
-    className: "dl-block",
-    style: {
-      marginTop: 0
-    }
-  }, React.createElement("h4", {
-    className: "dl-drillsite"
-  }, c.site.name, React.createElement("span", null, c.opening !== null ? `opening ${fmt(c.opening, 1)} + received ${fmt(c.received, 1)} − issued ${fmt(c.issued, 1)} = closing ${fmt(c.closing, 1)} L` : "no tank report this day")), c.issues.length === 0 && c.directRows.length === 0 ? React.createElement("p", {
-    className: "dl-hint"
-  }, "Purchases only — no fuel issued at this site this day.") : React.createElement("table", {
-    className: "dl-table"
-  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Fuel user"), React.createElement("th", null, "Source"), React.createElement("th", {
-    className: "r"
-  }, "Litres"))), React.createElement("tbody", null, c.issues.map((x, i) => React.createElement("tr", {
-    key: "t" + i,
-    className: x.id ? "click" : "",
-    onClick: x.id ? () => {
-      setDayDrill(null);
-      onOpen(c.site.id, x.id);
-    } : undefined
-  }, React.createElement("td", null, x.name), React.createElement("td", {
-    className: "dl-sub2"
-  }, "Site tank"), React.createElement("td", {
-    className: "r mono"
-  }, fmt(x.qty, 1)))), c.directRows.map((x, i) => React.createElement("tr", {
-    key: "d" + i,
-    className: "click",
-    onClick: () => {
-      setDayDrill(null);
-      onOpen(c.site.id, x.id);
-    }
-  }, React.createElement("td", null, x.name), React.createElement("td", {
-    className: "dl-sub2"
-  }, "Direct from pump"), React.createElement("td", {
-    className: "r mono"
-  }, fmt(x.qty, 1))))))))), drill && React.createElement(DrillDown, {
+  }, "open site dashboard →"))))), drill && React.createElement(DrillDown, {
     which: drill,
     fuel: fuel,
     sites: sites,
@@ -6385,6 +6381,14 @@ const css = `
   margin:0 0 8px;display:flex;justify-content:space-between;align-items:baseline;gap:10px;
   border-bottom:2px solid var(--ink);padding-bottom:5px;}
 .dl-drillsite span{font-family:ui-monospace,monospace;font-size:12px;color:var(--steel);}
+.dl-datetabs{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 10px;margin-bottom:8px;
+  scrollbar-width:thin;}
+.dl-datetab{flex:0 0 auto;padding:7px 13px;border:1.5px solid var(--line);border-radius:9px;
+  background:#fff;font-family:'Oswald','Arial Narrow',sans-serif;font-weight:600;font-size:13px;
+  letter-spacing:.03em;color:var(--steel);cursor:pointer;white-space:nowrap;}
+.dl-datetab:hover{border-color:var(--ink);color:var(--ink);}
+.dl-datetab.on{background:var(--ink);border-color:var(--ink);color:#fff;}
+.dl-snapsite{margin-top:16px;}
 
 /* charts */
 .dl-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:22px;}
