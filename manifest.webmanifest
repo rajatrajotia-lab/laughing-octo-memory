@@ -1,0 +1,15 @@
+{
+  "name": "HSD-REGISTER",
+  "short_name": "HSD-REGISTER",
+  "description": "Diesel fuel tracking: logbook, purchases, stock register and reports.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#12294A",
+  "background_color": "#EDF0F4",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
