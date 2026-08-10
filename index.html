@@ -969,6 +969,12 @@ function exportBundle(data, siteId) {
 }
 function mergeBundle(d, bundle, mode) {
   const deep = x => JSON.parse(JSON.stringify(x));
+  if (mode === "replaceAll") {
+    d.sites = [];
+    d.logs = {};
+    d.stock = {};
+    d.locks = {};
+  }
   const report = {
     sites: 0,
     machines: 0,
@@ -1017,17 +1023,15 @@ function mergeBundle(d, bundle, mode) {
       incoming.forEach(be => {
         const e = deep(be);
         if (e.siteId && siteMap[e.siteId]) e.siteId = siteMap[e.siteId];
-        const j = logs.findIndex(l => l.date === e.date && shiftOf(l) === shiftOf(e));
+        const j = logs.findIndex(l => l.id === e.id);
         if (j >= 0) {
-          if (mode === "replace") {
-            e.id = logs[j].id;
+          if (mode === "replace" || mode === "replaceAll") {
             logs[j] = e;
             report.updated += 1;
           } else {
             report.skipped += 1;
           }
         } else {
-          if (logs.some(l => l.id === e.id)) e.id = uid();
           logs.push(e);
           report.entries += 1;
         }
@@ -1045,7 +1049,7 @@ function mergeBundle(d, bundle, mode) {
       day.issues = mapped;
       const j = list.findIndex(x => x.date === day.date && (x.fuel || "HSD") === (day.fuel || "HSD"));
       if (j >= 0) {
-        if (mode === "replace") {
+        if (mode === "replace" || mode === "replaceAll") {
           day.id = list[j].id;
           list[j] = day;
           report.updated += 1;
@@ -2134,6 +2138,13 @@ function DieselLogbook() {
     hour: "2-digit",
     minute: "2-digit"
   }) : "Saved" : "Saving…"), React.createElement("button", {
+    className: "dl-btn",
+    title: "Write every change on this screen permanently to the database",
+    onClick: async () => {
+      const ok = await saveNow();
+      if (ok) setNote("Saved — every addition, edit and import is stored permanently.");
+    }
+  }, "Save"), React.createElement("button", {
     className: "dl-btn ghost",
     title: "Save, then pull the latest records — useful when several machines share this register",
     onClick: refreshNow
@@ -5661,7 +5672,7 @@ function DataTransfer({
   }, s.name))))), React.createElement("button", {
     className: "dl-btn",
     onClick: doExport
-  }, "Export file")), React.createElement("section", null, React.createElement("h4", null, "Receive at head office"), React.createElement("p", null, "Open a file sent from a site and merge it into this copy. Machines are matched on registration number or name, so nothing is duplicated, and a standard already set here is never overwritten by a blank one from site."), React.createElement("div", {
+  }, "Export file")), React.createElement("section", null, React.createElement("h4", null, "Receive at head office"), React.createElement("p", null, "Open a file sent from a site and merge it into this copy. Machines are matched on registration number or name, so nothing is duplicated. Choose \u201cReplace everything with the file\u201d when the file is the authoritative set — records deleted there are then removed here too."), React.createElement("div", {
     className: "dl-grid"
   }, React.createElement(F, {
     label: "If a day already exists here"
@@ -5672,7 +5683,9 @@ function DataTransfer({
     value: "skip"
   }, "Keep my version"), React.createElement("option", {
     value: "replace"
-  }, "Take the incoming version")))), React.createElement("input", {
+  }, "Take the incoming version"), React.createElement("option", {
+    value: "replaceAll"
+  }, "Replace everything with the file")))), React.createElement("input", {
     ref: fileRef,
     type: "file",
     accept: ".json,application/json",
