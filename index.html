@@ -1741,10 +1741,14 @@ function DieselLogbook() {
     });
   };
   const doReset = async () => {
-    try {
-      await window.storage.delete(STORE_KEY);
-    } catch (e) {}
     const fresh = emptyData();
+    fresh.imports = {
+      ...(data.imports || {}),
+      [KSDP_TAG]: true
+    };
+    try {
+      await window.storage.set(STORE_KEY, JSON.stringify(fresh));
+    } catch (e) {}
     setData(fresh);
     setSiteId(null);
     setMachineId(null);
