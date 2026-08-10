@@ -7,6 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
+<meta name="app-version" content="1.3.20" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -439,6 +440,17 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const APP_VERSION = "1.3.20";
+const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
+const cmpVer = (a, b) => {
+  const x = String(a || "").split(".").map(Number);
+  const y = String(b || "").split(".").map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] || 0) - (y[i] || 0);
+    if (d) return d > 0 ? 1 : -1;
+  }
+  return 0;
+};
 const monthLabel = k => {
   const [y, m] = k.split("-");
   return `${MONTHS[parseInt(m, 10) - 1]} ${y.slice(2)}`;
@@ -5620,7 +5632,44 @@ function DataTransfer({
   const [mode, setMode] = useState("skip");
   const [report, setReport] = useState(null);
   const [err, setErr] = useState("");
+  const [upd, setUpd] = useState(null);
   const fileRef = useRef(null);
+  const checkUpdates = async () => {
+    setUpd({ state: "checking" });
+    let latest = null;
+    try {
+      const r = await fetch(RELEASES_API, { cache: "no-store" });
+      if (!r.ok) throw new Error("http " + r.status);
+      latest = await r.json();
+    } catch (e) {
+      setUpd({ state: "offline" });
+      return;
+    }
+    const tag = String(latest.tag_name || "").replace(/^v/, "");
+    if (!tag || cmpVer(tag, APP_VERSION) <= 0) {
+      setUpd({ state: "current" });
+      return;
+    }
+    if (window.__hubStorage) {
+      try {
+        const r = await fetch("api/update", { method: "POST" });
+        const j = await r.json();
+        if (j.status === "updated") setUpd({ state: "restart", version: j.version });
+        else if (j.status === "current") setUpd({ state: "publishing", version: tag });
+        else setUpd({ state: "offline" });
+      } catch (e) {
+        setUpd({ state: "offline" });
+      }
+      return;
+    }
+    const isWv = /Android/.test(navigator.userAgent) && /; wv\)/.test(navigator.userAgent);
+    const apk = (latest.assets || []).find(a => /\.apk$/i.test(a.name || ""));
+    if (isWv && apk) {
+      setUpd({ state: "apk", version: tag, url: apk.browser_download_url });
+      return;
+    }
+    setUpd({ state: "reload", version: tag });
+  };
   const doExport = () => {
     const bundle = exportBundle(data, siteId);
     const name = siteId === "all" ? "ALL_SITES" : ((data.sites.find(s => s.id === siteId) || {}).name || "SITE").replace(/[^A-Za-z0-9]+/g, "_");
@@ -5723,7 +5772,32 @@ function DataTransfer({
   }, data.sites.map(s => React.createElement("option", {
     key: s.id,
     value: s.id
-  }, s.name)))))), React.createElement("section", {
+  }, s.name)))))), React.createElement("section", null, React.createElement("h4", null, "Updates"), React.createElement("p", null, "This copy is version " + APP_VERSION + ". The website copy always carries the latest version; installed apps fetch it from there."), React.createElement("div", {
+    className: "dl-updrow"
+  }, React.createElement("button", {
+    className: "dl-btn ghost",
+    disabled: upd && upd.state === "checking",
+    onClick: checkUpdates
+  }, upd && upd.state === "checking" ? "Checking\u2026" : "Check for updates"), upd && upd.state === "restart" && React.createElement("button", {
+    className: "dl-btn",
+    onClick: () => location.reload()
+  }, "Restart now \u2192 v" + upd.version), upd && upd.state === "apk" && React.createElement("button", {
+    className: "dl-btn",
+    onClick: () => { location.href = upd.url; }
+  }, "Download update (v" + upd.version + ")"), upd && upd.state === "reload" && React.createElement("button", {
+    className: "dl-btn",
+    onClick: () => location.reload()
+  }, "Reload to update \u2192 v" + upd.version)), upd && upd.state === "current" && React.createElement("p", {
+    className: "dl-hint"
+  }, "You are on the latest version."), upd && upd.state === "publishing" && React.createElement("p", {
+    className: "dl-hint"
+  }, "Version " + upd.version + " is still being published \u2014 try again in a few minutes."), upd && upd.state === "offline" && React.createElement("p", {
+    className: "dl-hint"
+  }, "Could not reach the update server. Check the internet connection and try again."), upd && upd.state === "apk" && React.createElement("p", {
+    className: "dl-hint"
+  }, "The download opens in the phone's browser. Open the downloaded file to install \u2014 your entries are kept."), upd && upd.state === "restart" && React.createElement("p", {
+    className: "dl-hint"
+  }, "The update is installed on this computer. Restarting the view loads it; other devices on the WiFi get it when they refresh.")), React.createElement("section", {
     className: "dl-access"
   }, React.createElement("h4", null, "Management passcode"), React.createElement("p", null, hasPasscode(data) ? "A passcode is set. The company dashboard and anything that deletes data ask for it, and the app relocks after twenty minutes idle." : "No passcode is set, so the company dashboard and the delete controls are open to anyone using this device."), React.createElement("button", {
     className: "dl-btn ghost",
@@ -6395,6 +6469,7 @@ const css = `
 .dl-datetab:hover{border-color:var(--ink);color:var(--ink);}
 .dl-datetab.on{background:var(--ink);border-color:var(--ink);color:#fff;}
 .dl-snapsite{margin-top:16px;}
+.dl-updrow{display:flex;gap:9px;flex-wrap:wrap;align-items:center;}
 
 /* charts */
 .dl-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:22px;}

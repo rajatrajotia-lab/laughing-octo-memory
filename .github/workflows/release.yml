@@ -141,6 +141,13 @@ jobs:
             Open the file on the phone and allow "install from unknown sources" when asked.
             Installs over older versions; your entries are kept.
 
+            ### Updating
+            The **Windows/Mac app updates itself**: at every launch it fetches the
+            newest version from the website, and there is a **Check for updates**
+            button on the Data Transfer screen. On the **phone app**, Check for
+            updates offers the newest APK — install it over the old one and your
+            entries are kept. Browser installs always update themselves on refresh.
+
             ### Share data on the same WiFi
             The Windows/Mac app acts as a data hub: start it on your main computer and a bar
             at the bottom shows an address like `http://192.168.1.5:8785` — open it in a

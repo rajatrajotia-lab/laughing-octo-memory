@@ -1,6 +1,7 @@
 /* Replaces the app's local storage layer with the shared hub store.
    All devices talking to this server see the same data. */
 (function () {
+  window.__hubStorage = true;
   var mem = {}, rev = 0, lastTouch = Date.now();
 
   function j(url, opts) {

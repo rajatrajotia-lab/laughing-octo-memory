@@ -24,7 +24,46 @@ function lanAddresses() {
   return out;
 }
 
-function createHub(appDir, dataFile) {
+const UPDATE_URL = "https://rajatrajotia-lab.github.io/laughing-octo-memory/index.html";
+
+function versionOf(raw) {
+  const m = /name="app-version" content="([0-9.]+)"/.exec(raw || "");
+  return m ? m[1] : null;
+}
+
+function cmpVer(a, b) {
+  const x = String(a || "").split(".").map(Number);
+  const y = String(b || "").split(".").map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] || 0) - (y[i] || 0);
+    if (d) return d > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
+function looksComplete(raw) {
+  return typeof raw === "string" && raw.includes('name="app-version"') && raw.trim().endsWith("</html>");
+}
+
+function fetchLatest() {
+  return new Promise((resolve, reject) => {
+    const https = require("https");
+    const req = https.get(UPDATE_URL, { timeout: 20000 }, res => {
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error("http " + res.statusCode)); }
+      let b = "";
+      res.setEncoding("utf8");
+      res.on("data", c => {
+        b += c;
+        if (b.length > 40 * 1024 * 1024) { req.destroy(); reject(new Error("too large")); }
+      });
+      res.on("end", () => resolve(b));
+    });
+    req.on("timeout", () => { req.destroy(); reject(new Error("timeout")); });
+    req.on("error", reject);
+  });
+}
+
+function createHub(appDir, dataFile, updateFile) {
   let store = { rev: 0, data: {} };
   try {
     const loaded = JSON.parse(fs.readFileSync(dataFile, "utf8"));
@@ -43,10 +82,35 @@ function createHub(appDir, dataFile) {
   }
 
   const shim = fs.readFileSync(path.join(__dirname, "netstorage.js"), "utf8");
-  const indexRaw = fs
-    .readFileSync(path.join(appDir, "index.html"), "utf8")
+  const prepare = raw => raw
     .replace("window.storage = {", "window.storageLocalUnused = {")
     .replace("<!-- React -->", "<script>\n" + shim + "\n</script>\n<!-- React -->");
+  const bundledRaw = fs.readFileSync(path.join(appDir, "index.html"), "utf8");
+  let currentRaw = bundledRaw;
+  /* A previously downloaded update lives in the data folder; serve it when
+     it is intact and newer than the bundled copy. */
+  try {
+    if (updateFile && fs.existsSync(updateFile)) {
+      const u = fs.readFileSync(updateFile, "utf8");
+      if (looksComplete(u) && cmpVer(versionOf(u), versionOf(bundledRaw)) > 0) currentRaw = u;
+    }
+  } catch (e) { /* fall back to the bundled copy */ }
+  let indexRaw = prepare(currentRaw);
+
+  async function checkUpdate() {
+    const fresh = await fetchLatest();
+    if (!looksComplete(fresh)) throw new Error("incomplete download");
+    const nv = versionOf(fresh);
+    const cv = versionOf(currentRaw);
+    if (!nv || cmpVer(nv, cv) <= 0) return { status: "current", version: cv };
+    if (updateFile) {
+      fs.writeFileSync(updateFile + ".tmp", fresh);
+      fs.renameSync(updateFile + ".tmp", updateFile);
+    }
+    currentRaw = fresh;
+    indexRaw = prepare(fresh);
+    return { status: "updated", version: nv };
+  }
 
   function page(isLocal, port) {
     if (!isLocal) return indexRaw;
@@ -96,6 +160,14 @@ function createHub(appDir, dataFile) {
         json(res, 200, store);
       } else if (req.method === "GET" && url === "/api/rev") {
         json(res, 200, { rev: store.rev });
+      } else if (req.method === "GET" && url === "/api/version") {
+        json(res, 200, { version: versionOf(currentRaw) });
+      } else if (req.method === "POST" && url === "/api/update") {
+        try {
+          json(res, 200, await checkUpdate());
+        } catch (e) {
+          json(res, 200, { status: "offline" });
+        }
       } else if (req.method === "POST" && url === "/api/set") {
         const b = JSON.parse(await readBody(req));
         if (typeof b.key !== "string" || typeof b.value !== "string") return json(res, 400, { error: "bad request" });
@@ -128,6 +200,8 @@ function createHub(appDir, dataFile) {
 
   return {
     server,
+    checkUpdate,
+    version: () => versionOf(currentRaw),
     hasData: () => Object.keys(store.data).length > 0,
     importData: (obj) => {
       for (const k of Object.keys(obj)) store.data[k] = obj[k];
@@ -154,4 +228,4 @@ function createHub(appDir, dataFile) {
   };
 }
 
-module.exports = { createHub, lanAddresses };
+module.exports = { createHub, lanAddresses, versionOf, cmpVer, looksComplete };

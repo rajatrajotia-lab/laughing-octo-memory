@@ -1,9 +1,12 @@
 const { app, BrowserWindow, shell } = require("electron");
 const path = require("path");
-const { createHub } = require("./server");
+const fs = require("fs");
+const { createHub, versionOf, cmpVer, looksComplete } = require("./server");
 
 const APP_DIR = path.join(__dirname, "app");
 let hubPort = null;
+let hub = null;
+let startFile = path.join(APP_DIR, "index.html");
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -21,10 +24,10 @@ function createWindow() {
        servers — if the page cannot load, fall back to the bundled file
        so the app always opens. */
     win.webContents.once("did-fail-load", () => {
-      win.loadFile(path.join(APP_DIR, "index.html"));
+      win.loadFile(startFile);
     });
   } else {
-    win.loadFile(path.join(APP_DIR, "index.html"));
+    win.loadFile(startFile);
   }
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -53,7 +56,6 @@ app.whenReady().then(async () => {
   try {
     /* The app used to be called "Fuel Register"; adopt its data folder
        so existing installs keep their records under the new name. */
-    const fs = require("fs");
     const dataFile = path.join(app.getPath("userData"), "shared-data.json");
     const oldFile = path.join(path.dirname(app.getPath("userData")), "Fuel Register", "shared-data.json");
     try {
@@ -62,13 +64,34 @@ app.whenReady().then(async () => {
         fs.copyFileSync(oldFile, dataFile);
       }
     } catch (e) { /* fresh install */ }
-    const hub = createHub(APP_DIR, dataFile);
+    const updateFile = path.join(app.getPath("userData"), "app-update.html");
+    /* Without a hub the window opens straight from a file; use a
+       previously downloaded update when it is intact and newer. */
+    try {
+      const u = fs.readFileSync(updateFile, "utf8");
+      const b = fs.readFileSync(startFile, "utf8");
+      if (looksComplete(u) && cmpVer(versionOf(u), versionOf(b)) > 0) startFile = updateFile;
+    } catch (e) { /* no update downloaded yet */ }
+    hub = createHub(APP_DIR, dataFile, updateFile);
     hubPort = await hub.listen([8785, 8786, 8787, 8788, 8789]);
     await migrateOldEntries(hub);
   } catch (e) {
     hubPort = null; // no free port: run standalone from the local file
   }
   createWindow();
+  /* Fetch the latest app from the website shortly after launch; when a
+     newer version arrives, reload so this window picks it up. */
+  if (hub && hubPort) {
+    setTimeout(async () => {
+      try {
+        const r = await hub.checkUpdate();
+        if (r.status === "updated") {
+          const w = BrowserWindow.getAllWindows()[0];
+          if (w) w.webContents.reload();
+        }
+      } catch (e) { /* offline; the in-app button can retry */ }
+    }, 3000);
+  }
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
