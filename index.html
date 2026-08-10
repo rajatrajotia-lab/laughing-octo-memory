@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.3.20" />
+<meta name="app-version" content="1.3.21" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -440,7 +440,7 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const APP_VERSION = "1.3.20";
+const APP_VERSION = "1.3.21";
 const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
 const cmpVer = (a, b) => {
   const x = String(a || "").split(".").map(Number);
@@ -2103,17 +2103,6 @@ function DieselLogbook() {
     hour: "2-digit",
     minute: "2-digit"
   }) : "Saved" : "Saving…"), React.createElement("button", {
-    className: "dl-btn",
-    title: "Write every change on this screen permanently to the database",
-    onClick: async () => {
-      const ok = await saveNow();
-      if (ok) setNote("Saved — every addition, edit and import is stored permanently.");
-    }
-  }, "Save"), React.createElement("button", {
-    className: "dl-btn ghost",
-    title: "Save, then pull the latest records — useful when several machines share this register",
-    onClick: refreshNow
-  }, "\u21bb Refresh"), React.createElement("button", {
     className: "dl-alertbtn" + (critical ? " critical" : warnings ? " warn" : " clear"),
     onClick: () => setDialog("alerts")
   }, React.createElement("span", {
@@ -2122,7 +2111,36 @@ function DieselLogbook() {
   }), alerts.length === 0 ? "All clear" : `${alerts.length} alert${alerts.length === 1 ? "" : "s"}`, critical > 0 && React.createElement("em", null, critical)), React.createElement("button", {
     className: "dl-btn ghost",
     onClick: () => setDialog("transfer")
-  }, "Transfer"))), React.createElement("nav", {
+  }, "Transfer"), React.createElement("button", {
+    className: "dl-iconbtn solid",
+    title: "Save — write every change permanently to the database",
+    "aria-label": "Save",
+    onClick: async () => {
+      const ok = await saveNow();
+      if (ok) setNote("Saved \u2014 every addition, edit and import is stored permanently.");
+    }
+  }, React.createElement("svg", {
+    width: 17,
+    height: 17,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2.2,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": "true"
+  }, React.createElement("path", {
+    d: "M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"
+  }), React.createElement("path", {
+    d: "M17 21v-8H7v8"
+  }), React.createElement("path", {
+    d: "M7 3v5h8"
+  }))), React.createElement("button", {
+    className: "dl-iconbtn",
+    title: "Refresh \u2014 save, then pull the latest records",
+    "aria-label": "Refresh",
+    onClick: refreshNow
+  }, "\u21bb"))), React.createElement("nav", {
     className: "dl-navbar"
   }, React.createElement("div", {
     className: "dl-switch",
@@ -6470,6 +6488,13 @@ const css = `
 .dl-datetab.on{background:var(--ink);border-color:var(--ink);color:#fff;}
 .dl-snapsite{margin-top:16px;}
 .dl-updrow{display:flex;gap:9px;flex-wrap:wrap;align-items:center;}
+.dl-iconbtn{width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;
+  border:2px solid var(--ink);background:var(--card);color:var(--ink);border-radius:var(--r);
+  cursor:pointer;padding:0;font-size:19px;line-height:1;transition:background .12s,color .12s;}
+.dl-iconbtn:hover{background:var(--ink);color:#fff;}
+.dl-iconbtn.solid{background:var(--ink);color:#fff;box-shadow:var(--sh-1);}
+.dl-iconbtn.solid:hover{background:var(--ink-2);}
+.dl-iconbtn:active{transform:translateY(1px);}
 
 /* charts */
 .dl-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:22px;}
