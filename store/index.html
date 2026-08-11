@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.1.0" />
+<meta name="app-version" content="1.2.0" />
 <link rel="icon" href="icon-192.png" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -113,9 +113,9 @@
     padding:8px 11px;font-size:12.5px;margin-bottom:11px;}
 
   /* ---------- MRN line editor ---------- */
-  .lhead{display:grid;grid-template-columns:minmax(0,1.6fr) 62px 72px 84px 26px;gap:6px;
+  .lhead{display:grid;grid-template-columns:minmax(0,1.5fr) 56px 52px 64px 78px 22px;gap:5px;
     font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;}
-  .lrow{display:grid;grid-template-columns:minmax(0,1.6fr) 62px 72px 84px 26px;gap:6px;
+  .lrow{display:grid;grid-template-columns:minmax(0,1.5fr) 56px 52px 64px 78px 22px;gap:5px;
     margin-bottom:7px;align-items:center;}
   .lrow select,.lrow input{width:100%;border:1px solid var(--line);border-radius:8px;
     padding:7px 7px;font-size:13px;background:#fff;color:var(--ink);min-width:0;}
@@ -188,7 +188,7 @@ var store = (function () {
   };
 })();
 
-var VERSION = "1.1.0";
+var VERSION = "1.2.0";
 
 /* ---------------- data ----------------
    data.mrns    : [{id,no,date,site,supplier,inv,po,notes,
@@ -827,9 +827,12 @@ function itemForm(it, onSaved){
 /* ---------------- MRN form (the only way material enters stock) ---------------- */
 function mrnLineHTML(L){
   L=L||{};
+  var it = L.item ? itemById(L.item) : null;
+  var unit = L.unit!=null ? L.unit : (it ? it.unit||"" : "");
   return '<div class="lrow">'
     +'<select class="lsel">'+itemOptions(L.item)+'</select>'
     +'<input class="lqty" type="number" min="0.0001" step="any" placeholder="qty" value="'+(L.qty||"")+'">'
+    +'<input class="lunit" maxlength="12" placeholder="unit" value="'+esc(unit)+'">'
     +'<input class="lrate" type="number" min="0" step="any" placeholder="rate" value="'+(L.rate||"")+'">'
     +'<input class="lamt" type="number" min="0" step="any" placeholder="amount" value="'+(L.amount||"")+'">'
     +'<button type="button" class="lrm" title="Remove line">✕</button></div>';
@@ -855,15 +858,15 @@ function mrnForm(m, draft){
     +'</div>'
     +'<div class="fg"><label>Supplier</label><input id="fsup" maxlength="80" value="'+esc(d.supplier||"")+'" list="dlsup" placeholder="vendor name"></div>'
     +'<div class="f2">'
-    +'<div class="fg"><label>Invoice / bill no.</label><input id="finv" maxlength="40" value="'+esc(d.inv||"")+'"></div>'
+    +'<div class="fg"><label>Invoice / bill no.</label><input id="finv" required maxlength="40" value="'+esc(d.inv||"")+'"></div>'
     +'<div class="fg"><label>PO no.</label><input id="fpo" maxlength="40" value="'+esc(d.po||"")+'" placeholder="optional"></div>'
     +'</div>'
-    +'<div class="fg"><label>Items received</label>'
-    +'<div class="lhead"><span>Item</span><span>Qty</span><span>Rate</span><span>Amount</span><span></span></div>'
+    +'<div class="fg"><label>Items received — one line per item on the invoice</label>'
+    +'<div class="lhead"><span>Item</span><span>Qty</span><span>Unit</span><span>Rate</span><span>Amount</span><span></span></div>'
     +'<div id="lines">'+d.lines.map(mrnLineHTML).join("")+'</div>'
     +'<div class="factions" style="justify-content:flex-start;margin-top:2px;gap:8px">'
-    +'<button type="button" class="btn ghost sm" id="baddline">+ Add line</button>'
-    +'<button type="button" class="btn ghost sm" id="fnewitem">+ New item</button></div>'
+    +'<button type="button" class="btn ghost sm" id="baddline">+ Add item</button>'
+    +'<button type="button" class="btn ghost sm" id="fnewitem">+ New item in master</button></div>'
     +'<div class="ltotal num" id="ltot"></div></div>'
     +'<div class="fg"><label>Notes</label><textarea id="fnotes" maxlength="300">'+esc(d.notes||"")+'</textarea></div>'
     +datalist("dlsup",suppliers)
@@ -880,17 +883,22 @@ function mrnForm(m, draft){
     document.getElementById("ltot").textContent = "Total  "+fmtMoney(t);
   }
   function wireRow(r){
-    var qty=r.querySelector(".lqty"), rate=r.querySelector(".lrate"), amt=r.querySelector(".lamt");
+    var sel=r.querySelector(".lsel"), qty=r.querySelector(".lqty"),
+        unit=r.querySelector(".lunit"), rate=r.querySelector(".lrate"), amt=r.querySelector(".lamt");
     function auto(){
       if (r.getAttribute("data-amttouch")==="1") { recalcTotal(); return; }
       var q=+qty.value||0, rt=+rate.value||0;
       amt.value = q&&rt ? +(q*rt).toFixed(2) : "";
       recalcTotal();
     }
+    sel.onchange=function(){
+      var it=itemById(sel.value);
+      unit.value = it ? it.unit||"" : "";
+    };
     qty.oninput=auto; rate.oninput=auto;
     amt.oninput=function(){ r.setAttribute("data-amttouch","1"); recalcTotal(); };
     r.querySelector(".lrm").onclick=function(){
-      if (rowEls().length<=1){ r.querySelector(".lsel").selectedIndex=0; qty.value=""; rate.value=""; amt.value=""; r.removeAttribute("data-amttouch"); recalcTotal(); return; }
+      if (rowEls().length<=1){ sel.selectedIndex=0; qty.value=""; unit.value=""; rate.value=""; amt.value=""; r.removeAttribute("data-amttouch"); recalcTotal(); return; }
       r.remove(); recalcTotal();
     };
   }
@@ -910,7 +918,8 @@ function mrnForm(m, draft){
       supplier:val("fsup"), inv:val("finv"), po:val("fpo"), notes:val("fnotes"),
       lines: rowEls().map(function(r){
         return { item:r.querySelector(".lsel").value, qty:r.querySelector(".lqty").value,
-                 rate:r.querySelector(".lrate").value, amount:r.querySelector(".lamt").value };
+                 unit:r.querySelector(".lunit").value, rate:r.querySelector(".lrate").value,
+                 amount:r.querySelector(".lamt").value };
       }) };
   }
   document.getElementById("fnewitem").onclick=function(){
@@ -931,13 +940,18 @@ function mrnForm(m, draft){
       var L=dr.lines[i];
       if (!L.item && !(+L.qty)) continue;               /* fully blank row — skip */
       if (!L.item){ alert("Choose an item on every line."); return; }
-      if (!(+L.qty>0)){ alert("Enter a quantity on every line."); return; }
+      if (!(+L.qty>0)){ alert("Enter a received quantity on every line."); return; }
+      if (!L.unit.trim()){ alert("Enter a unit of measurement on every line."); return; }
       var qn=+L.qty, rn=+L.rate||0;
       var an = L.amount!=="" ? +L.amount : +(qn*rn).toFixed(2);
+      /* unit lives on the item master — keep it in sync with what was entered */
+      var lit=itemById(L.item);
+      if (lit && lit.unit!==L.unit.trim()) lit.unit=L.unit.trim();
       lines.push({item:L.item, qty:qn, rate:rn, amount:an});
     }
     if (!lines.length){ alert("An MRN needs at least one item line."); return; }
     var no=dr.no.trim(); if (!no){ alert("Enter an MRN number."); return; }
+    if (!dr.inv.trim()){ alert("Enter the invoice number — every MRN is recorded against an invoice."); return; }
     var dup=data.mrns.some(function(x){ return x.no===no && (!isEdit || x.id!==m.id); });
     if (dup && !confirm('MRN number "'+no+'" is already used. Save anyway?')) return;
     var rec = isEdit ? m : {id:uid()};
