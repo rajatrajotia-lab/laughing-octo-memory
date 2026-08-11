@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.0.0" />
+<meta name="app-version" content="1.1.0" />
 <link rel="icon" href="icon-192.png" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -112,6 +112,16 @@
   .warnbox{background:#FBEBCF;border:1px solid #E6C98F;color:#5C4200;border-radius:9px;
     padding:8px 11px;font-size:12.5px;margin-bottom:11px;}
 
+  /* ---------- MRN line editor ---------- */
+  .lhead{display:grid;grid-template-columns:minmax(0,1.6fr) 62px 72px 84px 26px;gap:6px;
+    font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;}
+  .lrow{display:grid;grid-template-columns:minmax(0,1.6fr) 62px 72px 84px 26px;gap:6px;
+    margin-bottom:7px;align-items:center;}
+  .lrow select,.lrow input{width:100%;border:1px solid var(--line);border-radius:8px;
+    padding:7px 7px;font-size:13px;background:#fff;color:var(--ink);min-width:0;}
+  .lrow .lrm{background:none;border:none;color:var(--red);font-size:16px;padding:2px;line-height:1;}
+  .ltotal{text-align:right;font-weight:700;color:var(--navy);margin:6px 2px 2px;}
+
   /* ---------- ledger table ---------- */
   table.led{width:100%;border-collapse:collapse;font-size:12.5px;}
   table.led th{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;
@@ -160,8 +170,10 @@
 "use strict";
 /* =============================================================
    STORE-REGISTER — site store record keeping.
-   Item master, purchase receipts (GRN), issue slips, transfers,
-   stores ledger, low-stock alerts, CSV / JSON export.
+   MRN (Material Receipt Note) is the ONLY way material enters
+   stock: a numbered note with supplier, invoice and item lines.
+   Issue slips take material out; transfers move it between sites.
+   Stores ledger, low-stock alerts, CSV / JSON export.
    ============================================================= */
 
 /* ---- storage: the browser's own, with memory as a last resort ---- */
@@ -176,18 +188,45 @@ var store = (function () {
   };
 })();
 
-var VERSION = "1.0.0";
+var VERSION = "1.1.0";
 
-/* ---------------- data ---------------- */
+/* ---------------- data ----------------
+   data.mrns    : [{id,no,date,site,supplier,inv,po,notes,
+                    lines:[{item,qty,rate,amount}]}]        — stock IN
+   data.entries : {id,t:"I",date,site,item,qty,to,purpose,slip,auth,notes}
+                  {id,t:"T",date,from,to,item,qty,notes}    — stock OUT / move */
 var data = loadData();
-function blankData(){ return { v:1, sites:[], items:[], entries:[] }; }
+function blankData(){ return { v:2, sites:[], items:[], mrns:[], entries:[] }; }
+function pad4(n){ n=String(n); while (n.length<4) n="0"+n; return n; }
+function migrate(d){
+  if (!d || !Array.isArray(d.sites) || !Array.isArray(d.items) || !Array.isArray(d.entries)) return null;
+  if (!Array.isArray(d.mrns)) d.mrns = [];
+  /* v1 -> v2: loose purchase entries become single-line MRNs, numbered by date */
+  var purchases = d.entries.filter(function(e){ return e.t==="P"; });
+  if (purchases.length){
+    purchases.sort(function(a,b){
+      var ka=(a.date||"")+"|"+a.id, kb=(b.date||"")+"|"+b.id;
+      return ka<kb?-1:ka>kb?1:0;
+    });
+    var n = d.mrns.length;
+    purchases.forEach(function(p){
+      n++;
+      d.mrns.push({ id:p.id, no:"MRN-"+pad4(n), date:p.date, site:p.site,
+        supplier:p.supplier||"", inv:p.inv||"", po:p.po||"", notes:p.notes||"",
+        lines:[{item:p.item, qty:+p.qty||0, rate:+p.rate||0, amount:+p.amount||0}] });
+    });
+    d.entries = d.entries.filter(function(e){ return e.t!=="P"; });
+  }
+  d.mrns.forEach(function(m){ if (!Array.isArray(m.lines)) m.lines=[]; });
+  d.v = 2;
+  return d;
+}
 function loadData(){
   try {
     var raw = store.get("data");
     if (!raw) return blankData();
-    var d = JSON.parse(raw);
-    if (!d || !Array.isArray(d.sites) || !Array.isArray(d.items) || !Array.isArray(d.entries)) return blankData();
-    return d;
+    var d = migrate(JSON.parse(raw));
+    return d || blankData();
   } catch (e) { return blankData(); }
 }
 function save(){ store.set("data", JSON.stringify(data)); }
@@ -200,8 +239,15 @@ function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){retu
 
 function siteById(id){ for (var i=0;i<data.sites.length;i++) if (data.sites[i].id===id) return data.sites[i]; return null; }
 function itemById(id){ for (var i=0;i<data.items.length;i++) if (data.items[i].id===id) return data.items[i]; return null; }
+function mrnById(id){ for (var i=0;i<data.mrns.length;i++) if (data.mrns[i].id===id) return data.mrns[i]; return null; }
 function siteName(id){ var s=siteById(id); return s?s.name:"(deleted site)"; }
 function itemName(id){ var it=itemById(id); return it?it.name:"(deleted item)"; }
+function mrnTotal(m){ var t=0; m.lines.forEach(function(L){ t+=(+L.amount||0); }); return t; }
+function nextMrnNo(){
+  var mx=0;
+  data.mrns.forEach(function(m){ var t=/(\d+)\s*$/.exec(m.no||""); if (t) mx=Math.max(mx,+t[1]); });
+  return "MRN-"+pad4(mx+1);
+}
 
 /* ---------------- formatting ---------------- */
 function fmtQty(n){
@@ -221,38 +267,41 @@ function fmtDate(iso){
 }
 
 /* ---------------- stock math ---------------- */
-/* Entry shapes:
-   {id,t:"P",date,site,item,qty,rate,amount,supplier,inv,po,notes}
-   {id,t:"I",date,site,item,qty,to,purpose,slip,auth,notes}
-   {id,t:"T",date,from,to,item,qty,notes}                        */
-
 function stockOf(itemId, site){        /* site = site id or "all" */
-  var s = 0, e, i;
-  for (i=0;i<data.entries.length;i++){
-    e = data.entries[i];
-    if (e.item !== itemId) continue;
-    if (e.t === "P"){ if (site==="all" || e.site===site) s += (+e.qty||0); }
-    else if (e.t === "I"){ if (site==="all" || e.site===site) s -= (+e.qty||0); }
+  var s = 0;
+  data.mrns.forEach(function(m){
+    if (site!=="all" && m.site!==site) return;
+    m.lines.forEach(function(L){ if (L.item===itemId) s += (+L.qty||0); });
+  });
+  data.entries.forEach(function(e){
+    if (e.item !== itemId) return;
+    if (e.t === "I"){ if (site==="all" || e.site===site) s -= (+e.qty||0); }
     else if (e.t === "T"){
-      if (site==="all") continue;                    /* net zero overall */
+      if (site==="all") return;                    /* net zero overall */
       if (e.to===site)   s += (+e.qty||0);
       if (e.from===site) s -= (+e.qty||0);
     }
-  }
+  });
   return s;
 }
-function avgRate(itemId){              /* weighted average purchase rate (all sites) */
-  var q=0,a=0,e,i;
-  for (i=0;i<data.entries.length;i++){
-    e=data.entries[i];
-    if (e.t==="P" && e.item===itemId){ q += (+e.qty||0); a += (+e.amount||0); }
-  }
+function avgRate(itemId){              /* weighted average MRN rate (all sites) */
+  var q=0,a=0;
+  data.mrns.forEach(function(m){
+    m.lines.forEach(function(L){
+      if (L.item===itemId){ q += (+L.qty||0); a += (+L.amount||0); }
+    });
+  });
   return q>0 ? a/q : 0;
 }
-function entrySortKey(e){ return (e.date||"") + "|" + e.id; }
 function sortedEntries(){
   return data.entries.slice().sort(function(a,b){
-    var ka=entrySortKey(a), kb=entrySortKey(b);
+    var ka=(a.date||"")+"|"+a.id, kb=(b.date||"")+"|"+b.id;
+    return ka<kb?-1:ka>kb?1:0;
+  });
+}
+function sortedMrns(){
+  return data.mrns.slice().sort(function(a,b){
+    var ka=(a.date||"")+"|"+a.id, kb=(b.date||"")+"|"+b.id;
     return ka<kb?-1:ka>kb?1:0;
   });
 }
@@ -261,28 +310,52 @@ function inScope(e){
   if (e.t==="T") return e.from===S.site || e.to===S.site;
   return e.site===S.site;
 }
+function mrnInScope(m){ return S.site==="all" || m.site===S.site; }
+
+/* movements of one item, chronological: MRN lines + issues + transfers */
+function allMovements(itemId){
+  var mv=[];
+  data.mrns.forEach(function(m){
+    m.lines.forEach(function(L,ix){
+      if (L.item!==itemId) return;
+      mv.push({kind:"M", date:m.date||"", sid:m.id+":"+ix, m:m, line:L});
+    });
+  });
+  data.entries.forEach(function(e){
+    if (e.item!==itemId) return;
+    mv.push({kind:e.t, date:e.date||"", sid:e.id, e:e});
+  });
+  mv.sort(function(a,b){
+    var ka=a.date+"|"+a.sid, kb=b.date+"|"+b.sid;
+    return ka<kb?-1:ka>kb?1:0;
+  });
+  return mv;
+}
 function ledgerRows(itemId){
-  var rows=[], bal=0, all=sortedEntries(), e, i, delta;
-  for (i=0;i<all.length;i++){
-    e=all[i];
-    if (e.item!==itemId || !inScope(e)) continue;
-    delta = 0;
-    if (e.t==="P") delta = +e.qty||0;
-    else if (e.t==="I") delta = -(+e.qty||0);
-    else { /* transfer */
-      if (S.site==="all") continue;
-      delta = (e.to===S.site ? +e.qty||0 : 0) - (e.from===S.site ? +e.qty||0 : 0);
+  var rows=[], bal=0;
+  allMovements(itemId).forEach(function(x){
+    var delta=0;
+    if (x.kind==="M"){
+      if (S.site!=="all" && x.m.site!==S.site) return;
+      delta = +x.line.qty||0;
+    } else if (x.kind==="I"){
+      if (S.site!=="all" && x.e.site!==S.site) return;
+      delta = -(+x.e.qty||0);
+    } else {                                       /* transfer */
+      if (S.site==="all") return;
+      delta = (x.e.to===S.site ? +x.e.qty||0 : 0) - (x.e.from===S.site ? +x.e.qty||0 : 0);
+      if (!delta) return;
     }
     bal += delta;
-    rows.push({e:e, delta:delta, bal:bal});
-  }
+    rows.push({x:x, delta:delta, bal:bal});
+  });
   return rows;
 }
 
 /* ---------------- tabs / render ---------------- */
 var TABS = [
   {id:"home",  label:"Overview"},
-  {id:"rcpt",  label:"Receipts"},
+  {id:"mrn",   label:"MRN"},
   {id:"issue", label:"Issues"},
   {id:"items", label:"Items"},
   {id:"more",  label:"More"}
@@ -295,8 +368,8 @@ function render(){
   var v = document.getElementById("view");
   if (!data.sites.length){ v.innerHTML = firstRunHTML(); bindFirstRun(); setFab(false); return; }
   if (S.tab==="home")  { v.innerHTML = homeHTML();  setFab(false); }
-  if (S.tab==="rcpt")  { v.innerHTML = listHTML("P"); setFab(true); }
-  if (S.tab==="issue") { v.innerHTML = listHTML("I"); setFab(true); }
+  if (S.tab==="mrn")   { v.innerHTML = mrnListHTML(); setFab(true); }
+  if (S.tab==="issue") { v.innerHTML = issueListHTML(); setFab(true); }
   if (S.tab==="items") { v.innerHTML = itemsHTML(); setFab(true); }
   if (S.tab==="more")  { v.innerHTML = moreHTML();  setFab(false); bindMore(); }
   bindCommon();
@@ -327,7 +400,7 @@ function renderSiteSel(){
 function firstRunHTML(){
   return '<div class="card" style="margin-top:26px;text-align:center;padding:30px 18px">'
     +'<h2 style="font-size:17px">Start with a site</h2>'
-    +'<p style="color:var(--mut);max-width:380px;margin:8px auto 18px">Each store record — receipts, issues and stock — belongs to a site. Add your first site to begin.</p>'
+    +'<p style="color:var(--mut);max-width:380px;margin:8px auto 18px">Each store record — MRNs, issues and stock — belongs to a site. Add your first site to begin.</p>'
     +'<button class="btn acc" id="addsite0">Add a site</button></div>';
 }
 function bindFirstRun(){
@@ -345,16 +418,17 @@ function homeHTML(){
     if (it.reorder>0 && st<=it.reorder) low.push({it:it,st:st});
   });
   var monthP=0, monthI=0, m=today().slice(0,7);
+  data.mrns.forEach(function(x){
+    if (mrnInScope(x) && (x.date||"").slice(0,7)===m) monthP += mrnTotal(x);
+  });
   data.entries.forEach(function(e){
-    if (!inScope(e) || (e.date||"").slice(0,7)!==m) return;
-    if (e.t==="P") monthP += (+e.amount||0);
-    if (e.t==="I") monthI++;
+    if (e.t==="I" && inScope(e) && (e.date||"").slice(0,7)===m) monthI++;
   });
 
   var h='<div class="tiles">'
     +'<div class="tile"><div class="k">Items in stock</div><div class="v num">'+stockCount+'<span style="font-size:12px;color:var(--mut);font-weight:400"> / '+scopeItems.length+'</span></div></div>'
     +'<div class="tile"><div class="k">Stock value</div><div class="v num">'+fmtMoney(totValue)+'</div></div>'
-    +'<div class="tile"><div class="k">Purchases this month</div><div class="v num">'+fmtMoney(monthP)+'</div></div>'
+    +'<div class="tile"><div class="k">Receipts this month</div><div class="v num">'+fmtMoney(monthP)+'</div></div>'
     +'<div class="tile'+(low.length?" warn":"")+'"><div class="k">Low stock</div><div class="v num">'+low.length+'</div></div>'
     +'</div>';
 
@@ -370,26 +444,40 @@ function homeHTML(){
     h+='</div>';
   }
 
-  var recent = sortedEntries().filter(inScope).reverse().slice(0,8);
+  /* recent activity: MRN documents + issues + transfers, newest first */
+  var recent=[];
+  data.mrns.forEach(function(x){ if (mrnInScope(x)) recent.push({date:x.date||"", id:x.id, mrn:x}); });
+  data.entries.forEach(function(e){ if (inScope(e)) recent.push({date:e.date||"", id:e.id, e:e}); });
+  recent.sort(function(a,b){
+    var ka=a.date+"|"+a.id, kb=b.date+"|"+b.id;
+    return ka<kb?1:ka>kb?-1:0;
+  });
+  recent=recent.slice(0,8);
   h+='<div class="card"><h2>Recent activity</h2>';
-  if (!recent.length) h+='<div class="empty">Nothing recorded yet. Use the Receipts tab to enter your first purchase.</div>';
-  recent.forEach(function(e){ h+=entryRowHTML(e,false); });
+  if (!recent.length) h+='<div class="empty">Nothing recorded yet. Use the MRN tab to enter your first material receipt.</div>';
+  recent.forEach(function(x){ h += x.mrn ? mrnRowHTML(x.mrn,false) : entryRowHTML(x.e,false); });
   h+='</div>';
   return h;
 }
 
-/* ---------------- entry rows & lists ---------------- */
+/* ---------------- rows ---------------- */
+function mrnRowHTML(m, withMenu){
+  var names = m.lines.map(function(L){ return itemName(L.item); });
+  var title = esc(m.no||"MRN")+(m.supplier?' · '+esc(m.supplier):'');
+  var sub = fmtDate(m.date)+' · '+esc(siteName(m.site))
+    +(m.inv?' · Inv '+esc(m.inv):'')
+    +' · '+esc(names.join(", "));
+  return '<div class="row in"'+(withMenu?' data-mrnopen="'+m.id+'" style="cursor:pointer"':'')+'>'
+    +'<div class="rmain"><div class="rtitle">'+title+'</div><div class="rsub">'+sub+'</div></div>'
+    +'<div class="rqty in"><div class="q num">'+fmtMoney(mrnTotal(m))+'</div>'
+    +'<div class="m">'+m.lines.length+(m.lines.length===1?' item':' items')+'</div></div>'
+    +(withMenu?'<button class="iconb" data-mrnmenu="'+m.id+'">⋯</button>':'')
+    +'</div>';
+}
 function entryRowHTML(e, withMenu){
   var it=itemById(e.item), unit=it?it.unit||"":"";
   var cls, qty, title, sub;
-  if (e.t==="P"){
-    cls="in"; qty="+"+fmtQty(e.qty)+" "+esc(unit);
-    title=esc(itemName(e.item));
-    sub=fmtDate(e.date)+" · "+esc(siteName(e.site))
-      +(e.supplier?" · "+esc(e.supplier):"")
-      +(e.inv?" · Inv "+esc(e.inv):"")
-      +" · "+fmtMoney(e.amount);
-  } else if (e.t==="I"){
+  if (e.t==="I"){
     cls="out"; qty="−"+fmtQty(e.qty)+" "+esc(unit);
     title=esc(itemName(e.item));
     sub=fmtDate(e.date)+" · "+esc(siteName(e.site))
@@ -408,31 +496,52 @@ function entryRowHTML(e, withMenu){
     +'</div>';
 }
 
-function listHTML(type){
+/* ---------------- MRN list ---------------- */
+function mrnListHTML(){
   var q=(S.q||"").toLowerCase();
-  var rows = sortedEntries().reverse().filter(function(e){
-    if (type==="P" && e.t!=="P") return false;
-    if (type==="I" && !(e.t==="I"||e.t==="T")) return false;
-    if (!inScope(e)) return false;
+  var rows = sortedMrns().reverse().filter(function(m){
+    if (!mrnInScope(m)) return false;
     if (!q) return true;
-    var hay=(itemName(e.item)+" "+(e.supplier||"")+" "+(e.inv||"")+" "+(e.to||"")+" "+(e.purpose||"")+" "+(e.slip||"")+" "+(e.po||"")).toLowerCase();
+    var hay=((m.no||"")+" "+(m.supplier||"")+" "+(m.inv||"")+" "+(m.po||"")+" "
+      +m.lines.map(function(L){return itemName(L.item);}).join(" ")).toLowerCase();
     return hay.indexOf(q)>=0;
   });
-  var label = type==="P" ? "receipts" : "issues";
   var h='<div class="toolrow">'
-    +'<input class="search" id="q" placeholder="Search '+label+'…" value="'+esc(S.q)+'">'
-    +(type==="I"?'<button class="btn ghost sm" id="btr">Transfer</button>':"")
+    +'<input class="search" id="q" placeholder="Search MRNs…" value="'+esc(S.q)+'">'
     +'<button class="btn ghost sm" id="bcsv">CSV</button></div>';
   if (!rows.length){
-    h+='<div class="card"><div class="empty">'+(q?'No matches.':(type==="P"
-      ?'No receipts yet. Tap + to record a purchase — supplier, invoice number, quantity, rate.'
-      :'No issues yet. Tap + to record an issue slip — who took what, and for which work.'))+'</div></div>';
+    h+='<div class="card"><div class="empty">'+(q?'No matches.'
+      :'No MRNs yet. Tap + to record a Material Receipt Note — every item that enters stock comes in through an MRN.')+'</div></div>';
     return h;
   }
-  var totalAmt=0, totalCount=rows.length;
-  if (type==="P") rows.forEach(function(e){ totalAmt+=(+e.amount||0); });
+  var total=0; rows.forEach(function(m){ total+=mrnTotal(m); });
   h+='<div class="card">';
-  if (type==="P") h+='<div class="rsub" style="margin-bottom:6px">'+totalCount+' receipts · total '+fmtMoney(totalAmt)+'</div>';
+  h+='<div class="rsub" style="margin-bottom:6px">'+rows.length+' MRNs · total '+fmtMoney(total)+'</div>';
+  rows.forEach(function(m){ h+=mrnRowHTML(m,true); });
+  h+='</div>';
+  return h;
+}
+
+/* ---------------- issues list ---------------- */
+function issueListHTML(){
+  var q=(S.q||"").toLowerCase();
+  var rows = sortedEntries().reverse().filter(function(e){
+    if (!(e.t==="I"||e.t==="T")) return false;
+    if (!inScope(e)) return false;
+    if (!q) return true;
+    var hay=(itemName(e.item)+" "+(e.to||"")+" "+(e.purpose||"")+" "+(e.slip||"")+" "+(e.auth||"")).toLowerCase();
+    return hay.indexOf(q)>=0;
+  });
+  var h='<div class="toolrow">'
+    +'<input class="search" id="q" placeholder="Search issues…" value="'+esc(S.q)+'">'
+    +'<button class="btn ghost sm" id="btr">Transfer</button>'
+    +'<button class="btn ghost sm" id="bcsv">CSV</button></div>';
+  if (!rows.length){
+    h+='<div class="card"><div class="empty">'+(q?'No matches.'
+      :'No issues yet. Tap + to record an issue slip — who took what, and for which work.')+'</div></div>';
+    return h;
+  }
+  h+='<div class="card">';
   rows.forEach(function(e){ h+=entryRowHTML(e,true); });
   h+='</div>';
   return h;
@@ -470,7 +579,8 @@ function itemsHTML(){
 function moreHTML(){
   var h='<div class="card"><h2>Sites</h2>';
   data.sites.forEach(function(s){
-    var used = data.entries.some(function(e){ return e.site===s.id||e.from===s.id||e.to===s.id; });
+    var used = data.entries.some(function(e){ return e.site===s.id||e.from===s.id||e.to===s.id; })
+            || data.mrns.some(function(m){ return m.site===s.id; });
     h+='<div class="row"><div class="rmain"><div class="rtitle">'+esc(s.name)+'</div></div>'
       +'<button class="btn ghost sm" data-esite="'+s.id+'">Edit</button>'
       +(used?'':'<button class="btn ghost sm" data-dsite="'+s.id+'" style="color:var(--red)">Delete</button>')
@@ -483,7 +593,7 @@ function moreHTML(){
     +'<div class="fg"><label>From</label><input type="date" id="expfrom"></div>'
     +'<div class="fg"><label>To</label><input type="date" id="expto"></div></div>'
     +'<div class="factions" style="justify-content:flex-start;margin-top:0;gap:8px">'
-    +'<button class="btn ghost sm" id="bexr">Receipts CSV</button>'
+    +'<button class="btn ghost sm" id="bexr">MRN register CSV</button>'
     +'<button class="btn ghost sm" id="bexi">Issues CSV</button>'
     +'<button class="btn ghost sm" id="bexs">Stock summary CSV</button></div>'
     +'<div class="fhint">Exports respect the site selected at the top. Leave dates blank for everything.</div></div>';
@@ -493,7 +603,7 @@ function moreHTML(){
     +'<button class="btn sm" id="bbk">Download backup</button>'
     +'<button class="btn ghost sm" id="brs">Restore from file</button>'
     +'<input type="file" id="rsfile" accept=".json,application/json" style="display:none"></div>'
-    +'<div class="fhint">The backup file holds every site, item, receipt and issue. Keep one after each working day.</div></div>';
+    +'<div class="fhint">The backup file holds every site, item, MRN and issue. Keep one after each working day.</div></div>';
 
   h+='<div class="card"><h2>Danger zone</h2>'
     +'<button class="btn danger sm" id="bwipe">Erase all data</button>'
@@ -507,15 +617,15 @@ function bindCommon(){
   if (q) q.oninput=function(){ S.q=q.value;
     var view=document.getElementById("view");
     var scroll=window.scrollY;
-    if (S.tab==="rcpt") view.innerHTML=listHTML("P");
-    else if (S.tab==="issue") view.innerHTML=listHTML("I");
+    if (S.tab==="mrn") view.innerHTML=mrnListHTML();
+    else if (S.tab==="issue") view.innerHTML=issueListHTML();
     else if (S.tab==="items") view.innerHTML=itemsHTML();
     bindCommon(); window.scrollTo(0,scroll);
     var q2=document.getElementById("q"); q2.focus(); q2.setSelectionRange(q2.value.length,q2.value.length);
   };
   var fab=document.getElementById("fab");
   fab.onclick=function(){
-    if (S.tab==="rcpt") receiptForm();
+    if (S.tab==="mrn") mrnForm();
     else if (S.tab==="issue") issueForm();
     else if (S.tab==="items") itemForm();
   };
@@ -523,15 +633,21 @@ function bindCommon(){
   if (btr) btr.onclick=function(){ transferForm(); };
   var bcsv=document.getElementById("bcsv");
   if (bcsv) bcsv.onclick=function(){
-    if (S.tab==="rcpt") exportReceipts("","");
+    if (S.tab==="mrn") exportMrns("","");
     else if (S.tab==="issue") exportIssues("","");
     else exportStock();
   };
   document.querySelectorAll("[data-led]").forEach(function(el){
     el.onclick=function(ev){ if (ev.target.closest("[data-itemmenu]")) return; ledgerModal(el.getAttribute("data-led")); };
   });
+  document.querySelectorAll("[data-mrnopen]").forEach(function(el){
+    el.onclick=function(ev){ if (ev.target.closest("[data-mrnmenu]")) return; var m=mrnById(el.getAttribute("data-mrnopen")); if (m) mrnForm(m); };
+  });
   document.querySelectorAll("[data-menu]").forEach(function(el){
     el.onclick=function(ev){ ev.stopPropagation(); entryMenu(el, el.getAttribute("data-menu")); };
+  });
+  document.querySelectorAll("[data-mrnmenu]").forEach(function(el){
+    el.onclick=function(ev){ ev.stopPropagation(); mrnMenu(el, el.getAttribute("data-mrnmenu")); };
   });
   document.querySelectorAll("[data-itemmenu]").forEach(function(el){
     el.onclick=function(ev){ ev.stopPropagation(); itemMenu(el, el.getAttribute("data-itemmenu")); };
@@ -552,7 +668,7 @@ function bindMore(){
       }
     };
   });
-  document.getElementById("bexr").onclick=function(){ exportReceipts(val("expfrom"),val("expto")); };
+  document.getElementById("bexr").onclick=function(){ exportMrns(val("expfrom"),val("expto")); };
   document.getElementById("bexi").onclick=function(){ exportIssues(val("expfrom"),val("expto")); };
   document.getElementById("bexs").onclick=function(){ exportStock(); };
   document.getElementById("bbk").onclick=backup;
@@ -560,7 +676,7 @@ function bindMore(){
   document.getElementById("brs").onclick=function(){ rsf.click(); };
   rsf.onchange=function(){ if (rsf.files[0]) restore(rsf.files[0]); rsf.value=""; };
   document.getElementById("bwipe").onclick=function(){
-    if (confirm("Erase ALL sites, items, receipts and issues on this device?")
+    if (confirm("Erase ALL sites, items, MRNs and issues on this device?")
       && confirm("This cannot be undone. Really erase everything?")){
       data=blankData(); S.site="all"; save(); render();
     }
@@ -591,7 +707,7 @@ function entryMenu(anchor,id){
   var m=showMenu(anchor,'<button data-a="e">Edit</button><button data-a="d" class="danger">Delete</button>');
   m.querySelector('[data-a="e"]').onclick=function(){
     closeMenu();
-    if (e.t==="P") receiptForm(e); else if (e.t==="I") issueForm(e); else transferForm(e);
+    if (e.t==="I") issueForm(e); else transferForm(e);
   };
   m.querySelector('[data-a="d"]').onclick=function(){
     closeMenu();
@@ -601,9 +717,22 @@ function entryMenu(anchor,id){
     }
   };
 }
+function mrnMenu(anchor,id){
+  var mrn=mrnById(id); if (!mrn) return;
+  var m=showMenu(anchor,'<button data-a="e">Open / edit</button><button data-a="d" class="danger">Delete</button>');
+  m.querySelector('[data-a="e"]').onclick=function(){ closeMenu(); mrnForm(mrn); };
+  m.querySelector('[data-a="d"]').onclick=function(){
+    closeMenu();
+    if (confirm("Delete "+(mrn.no||"this MRN")+"? All its items leave the stock figures.")){
+      data.mrns=data.mrns.filter(function(x){return x.id!==id;});
+      save(); render();
+    }
+  };
+}
 function itemMenu(anchor,id){
   var it=itemById(id); if (!it) return;
-  var used=data.entries.some(function(e){ return e.item===id; });
+  var used=data.entries.some(function(e){ return e.item===id; })
+        || data.mrns.some(function(m){ return m.lines.some(function(L){ return L.item===id; }); });
   var m=showMenu(anchor,'<button data-a="l">Ledger</button><button data-a="e">Edit</button>'
     +(used?'':'<button data-a="d" class="danger">Delete</button>'));
   m.querySelector('[data-a="l"]').onclick=function(){ closeMenu(); ledgerModal(id); };
@@ -635,7 +764,8 @@ function siteOptions(sel){
   }).join("");
 }
 function itemOptions(sel){
-  return data.items.slice().sort(function(a,b){ return a.name.toLowerCase()<b.name.toLowerCase()?-1:1; })
+  return '<option value="" disabled'+(sel?"":" selected")+'>— item —</option>'
+    + data.items.slice().sort(function(a,b){ return a.name.toLowerCase()<b.name.toLowerCase()?-1:1; })
     .map(function(it){ return '<option value="'+it.id+'"'+(sel===it.id?" selected":"")+'>'+esc(it.name)+(it.unit?" ("+esc(it.unit)+")":"")+'</option>'; }).join("");
 }
 function datalist(id, values){
@@ -694,53 +824,127 @@ function itemForm(it, onSaved){
   document.getElementById("fname").focus();
 }
 
-/* ---------------- receipt (purchase / GRN) form ---------------- */
-function receiptForm(e){
-  var isEdit=!!e; e=e||{};
-  if (!data.items.length && !isEdit){
-    itemForm(null,function(){ receiptForm(); });
+/* ---------------- MRN form (the only way material enters stock) ---------------- */
+function mrnLineHTML(L){
+  L=L||{};
+  return '<div class="lrow">'
+    +'<select class="lsel">'+itemOptions(L.item)+'</select>'
+    +'<input class="lqty" type="number" min="0.0001" step="any" placeholder="qty" value="'+(L.qty||"")+'">'
+    +'<input class="lrate" type="number" min="0" step="any" placeholder="rate" value="'+(L.rate||"")+'">'
+    +'<input class="lamt" type="number" min="0" step="any" placeholder="amount" value="'+(L.amount||"")+'">'
+    +'<button type="button" class="lrm" title="Remove line">✕</button></div>';
+}
+function mrnForm(m, draft){
+  var isEdit=!!m;
+  if (!data.items.length && !draft){
+    itemForm(null,function(){ mrnForm(m); });
     return;
   }
-  var suppliers=data.entries.filter(function(x){return x.t==="P";}).map(function(x){return x.supplier;});
-  openModal('<h2>'+(isEdit?"Edit receipt":"Material receipt")+'</h2><form id="f">'
-    +'<div class="f2">'
-    +'<div class="fg"><label>Date</label><input id="fdate" type="date" required value="'+esc(e.date||today())+'"></div>'
-    +'<div class="fg"><label>Site</label><select id="fsite" required>'+siteOptions(e.site||defaultSite())+'</select></div>'
-    +'</div>'
-    +'<div class="fg"><label>Item</label><div style="display:flex;gap:8px">'
-    +'<select id="fitem" required style="flex:1">'+itemOptions(e.item)+'</select>'
-    +'<button type="button" class="btn ghost sm" id="fnewitem">+ New</button></div></div>'
+  var d = draft || (m
+    ? {no:m.no,date:m.date,site:m.site,supplier:m.supplier,inv:m.inv,po:m.po,notes:m.notes,
+       lines:m.lines.map(function(L){ return {item:L.item,qty:L.qty,rate:L.rate,amount:L.amount}; })}
+    : {no:nextMrnNo(),date:today(),site:defaultSite(),supplier:"",inv:"",po:"",notes:"",lines:[{}]});
+  if (!d.lines.length) d.lines=[{}];
+  var suppliers=data.mrns.map(function(x){return x.supplier;});
+
+  openModal('<h2>'+(isEdit?"MRN — "+esc(d.no||""): "New Material Receipt Note")+'</h2><form id="f">'
     +'<div class="f3">'
-    +'<div class="fg"><label>Quantity</label><input id="fqty" type="number" min="0.0001" step="any" required value="'+(e.qty||"")+'"></div>'
-    +'<div class="fg"><label>Rate</label><input id="frate" type="number" min="0" step="any" required value="'+(e.rate||"")+'"></div>'
-    +'<div class="fg"><label>Amount</label><input id="famt" type="number" min="0" step="any" value="'+(e.amount||"")+'"><div class="fhint">auto = qty × rate</div></div>'
+    +'<div class="fg"><label>MRN no.</label><input id="fno" required maxlength="24" value="'+esc(d.no||"")+'"></div>'
+    +'<div class="fg"><label>Date</label><input id="fdate" type="date" required value="'+esc(d.date||today())+'"></div>'
+    +'<div class="fg"><label>Site</label><select id="fsite" required>'+siteOptions(d.site||defaultSite())+'</select></div>'
     +'</div>'
-    +'<div class="fg"><label>Supplier</label><input id="fsup" maxlength="80" value="'+esc(e.supplier||"")+'" list="dlsup" placeholder="vendor name"></div>'
+    +'<div class="fg"><label>Supplier</label><input id="fsup" maxlength="80" value="'+esc(d.supplier||"")+'" list="dlsup" placeholder="vendor name"></div>'
     +'<div class="f2">'
-    +'<div class="fg"><label>Invoice / bill no.</label><input id="finv" maxlength="40" value="'+esc(e.inv||"")+'"></div>'
-    +'<div class="fg"><label>PO no.</label><input id="fpo" maxlength="40" value="'+esc(e.po||"")+'" placeholder="optional"></div>'
+    +'<div class="fg"><label>Invoice / bill no.</label><input id="finv" maxlength="40" value="'+esc(d.inv||"")+'"></div>'
+    +'<div class="fg"><label>PO no.</label><input id="fpo" maxlength="40" value="'+esc(d.po||"")+'" placeholder="optional"></div>'
     +'</div>'
-    +'<div class="fg"><label>Notes</label><textarea id="fnotes" maxlength="300">'+esc(e.notes||"")+'</textarea></div>'
+    +'<div class="fg"><label>Items received</label>'
+    +'<div class="lhead"><span>Item</span><span>Qty</span><span>Rate</span><span>Amount</span><span></span></div>'
+    +'<div id="lines">'+d.lines.map(mrnLineHTML).join("")+'</div>'
+    +'<div class="factions" style="justify-content:flex-start;margin-top:2px;gap:8px">'
+    +'<button type="button" class="btn ghost sm" id="baddline">+ Add line</button>'
+    +'<button type="button" class="btn ghost sm" id="fnewitem">+ New item</button></div>'
+    +'<div class="ltotal num" id="ltot"></div></div>'
+    +'<div class="fg"><label>Notes</label><textarea id="fnotes" maxlength="300">'+esc(d.notes||"")+'</textarea></div>'
     +datalist("dlsup",suppliers)
     +'<div class="factions"><button type="button" class="btn ghost" id="fcancel">Cancel</button>'
-    +'<button class="btn acc" type="submit">'+(isEdit?"Save changes":"Save receipt")+'</button></div></form>');
+    +'<button class="btn acc" type="submit">'+(isEdit?"Save changes":"Save MRN")+'</button></div></form>');
+
   document.getElementById("fcancel").onclick=closeModal;
-  document.getElementById("fnewitem").onclick=function(){
-    itemForm(null,function(newId){ receiptForm(isEdit?e:undefined); var sel=document.getElementById("fitem"); if (sel) sel.value=newId; });
+  var linesEl=document.getElementById("lines");
+
+  function rowEls(){ return Array.prototype.slice.call(linesEl.querySelectorAll(".lrow")); }
+  function recalcTotal(){
+    var t=0;
+    rowEls().forEach(function(r){ t += +r.querySelector(".lamt").value||0; });
+    document.getElementById("ltot").textContent = "Total  "+fmtMoney(t);
+  }
+  function wireRow(r){
+    var qty=r.querySelector(".lqty"), rate=r.querySelector(".lrate"), amt=r.querySelector(".lamt");
+    function auto(){
+      if (r.getAttribute("data-amttouch")==="1") { recalcTotal(); return; }
+      var q=+qty.value||0, rt=+rate.value||0;
+      amt.value = q&&rt ? +(q*rt).toFixed(2) : "";
+      recalcTotal();
+    }
+    qty.oninput=auto; rate.oninput=auto;
+    amt.oninput=function(){ r.setAttribute("data-amttouch","1"); recalcTotal(); };
+    r.querySelector(".lrm").onclick=function(){
+      if (rowEls().length<=1){ r.querySelector(".lsel").selectedIndex=0; qty.value=""; rate.value=""; amt.value=""; r.removeAttribute("data-amttouch"); recalcTotal(); return; }
+      r.remove(); recalcTotal();
+    };
+  }
+  rowEls().forEach(wireRow);
+  recalcTotal();
+
+  document.getElementById("baddline").onclick=function(){
+    var div=document.createElement("div");
+    div.innerHTML=mrnLineHTML({});
+    var r=div.firstChild;
+    linesEl.appendChild(r); wireRow(r);
+    r.querySelector(".lsel").focus();
   };
-  var qtyEl=document.getElementById("fqty"), rateEl=document.getElementById("frate"), amtEl=document.getElementById("famt");
-  var amtTouched=false;
-  amtEl.oninput=function(){ amtTouched=true; };
-  function recalc(){ if (!amtTouched){ var q=+qtyEl.value||0, r=+rateEl.value||0; amtEl.value = q&&r ? +(q*r).toFixed(2) : ""; } }
-  qtyEl.oninput=recalc; rateEl.oninput=recalc;
+
+  function readDraft(){
+    return { no:val("fno"), date:val("fdate"), site:val("fsite"),
+      supplier:val("fsup"), inv:val("finv"), po:val("fpo"), notes:val("fnotes"),
+      lines: rowEls().map(function(r){
+        return { item:r.querySelector(".lsel").value, qty:r.querySelector(".lqty").value,
+                 rate:r.querySelector(".lrate").value, amount:r.querySelector(".lamt").value };
+      }) };
+  }
+  document.getElementById("fnewitem").onclick=function(){
+    var dr=readDraft();
+    itemForm(null,function(newId){
+      var empty=null;
+      dr.lines.forEach(function(L){ if (!empty && !L.item) empty=L; });
+      if (empty) empty.item=newId; else dr.lines.push({item:newId});
+      mrnForm(m, dr);
+    });
+  };
+
   document.getElementById("f").onsubmit=function(ev){
     ev.preventDefault();
-    var rec = isEdit ? e : {id:uid(),t:"P"};
-    rec.date=val("fdate"); rec.site=val("fsite"); rec.item=val("fitem");
-    rec.qty=+val("fqty"); rec.rate=+val("frate");
-    rec.amount=+val("famt")||+(rec.qty*rec.rate).toFixed(2);
-    rec.supplier=val("fsup").trim(); rec.inv=val("finv").trim(); rec.po=val("fpo").trim(); rec.notes=val("fnotes").trim();
-    if (!isEdit) data.entries.push(rec);
+    var dr=readDraft();
+    var lines=[];
+    for (var i=0;i<dr.lines.length;i++){
+      var L=dr.lines[i];
+      if (!L.item && !(+L.qty)) continue;               /* fully blank row — skip */
+      if (!L.item){ alert("Choose an item on every line."); return; }
+      if (!(+L.qty>0)){ alert("Enter a quantity on every line."); return; }
+      var qn=+L.qty, rn=+L.rate||0;
+      var an = L.amount!=="" ? +L.amount : +(qn*rn).toFixed(2);
+      lines.push({item:L.item, qty:qn, rate:rn, amount:an});
+    }
+    if (!lines.length){ alert("An MRN needs at least one item line."); return; }
+    var no=dr.no.trim(); if (!no){ alert("Enter an MRN number."); return; }
+    var dup=data.mrns.some(function(x){ return x.no===no && (!isEdit || x.id!==m.id); });
+    if (dup && !confirm('MRN number "'+no+'" is already used. Save anyway?')) return;
+    var rec = isEdit ? m : {id:uid()};
+    rec.no=no; rec.date=dr.date; rec.site=dr.site;
+    rec.supplier=dr.supplier.trim(); rec.inv=dr.inv.trim(); rec.po=dr.po.trim(); rec.notes=dr.notes.trim();
+    rec.lines=lines;
+    if (!isEdit) data.mrns.push(rec);
     save(); closeModal(); render();
   };
 }
@@ -748,7 +952,7 @@ function receiptForm(e){
 /* ---------------- issue slip form ---------------- */
 function issueForm(e){
   var isEdit=!!e; e=e||{};
-  if (!data.items.length){ alert("Add an item and record a receipt first."); return; }
+  if (!data.items.length){ alert("Add an item and record an MRN first."); return; }
   var tos=data.entries.filter(function(x){return x.t==="I";}).map(function(x){return x.to;});
   var purposes=data.entries.filter(function(x){return x.t==="I";}).map(function(x){return x.purpose;});
   openModal('<h2>'+(isEdit?"Edit issue":"Material issue")+'</h2><form id="f">'
@@ -773,6 +977,7 @@ function issueForm(e){
   document.getElementById("fcancel").onclick=closeModal;
   function checkStock(){
     var itemId=val("fitem"), site=val("fsite"), q=+val("fqty")||0;
+    if (!itemId){ document.getElementById("avail").textContent=""; return; }
     var st=stockOf(itemId,site);
     if (isEdit && e.item===itemId && e.site===site) st += (+e.qty||0);   /* editing: exclude own old qty */
     var it=itemById(itemId), unit=it?it.unit||"":"";
@@ -784,6 +989,7 @@ function issueForm(e){
   checkStock();
   document.getElementById("f").onsubmit=function(ev){
     ev.preventDefault();
+    if (!val("fitem")){ alert("Choose an item."); return; }
     var rec = isEdit ? e : {id:uid(),t:"I"};
     rec.date=val("fdate"); rec.site=val("fsite"); rec.item=val("fitem");
     rec.qty=+val("fqty"); rec.to=val("fto").trim(); rec.purpose=val("fpur").trim();
@@ -812,6 +1018,7 @@ function transferForm(e){
     +'<button class="btn acc" type="submit">'+(isEdit?"Save changes":"Save transfer")+'</button></div></form>');
   document.getElementById("fcancel").onclick=closeModal;
   function upd(){
+    if (!val("fitem")){ document.getElementById("avail").textContent=""; return; }
     var it=itemById(val("fitem")), st=stockOf(val("fitem"),val("ffrom"));
     if (isEdit && e.item===val("fitem") && e.from===val("ffrom")) st += (+e.qty||0);
     document.getElementById("avail").textContent="Available at source site: "+fmtQty(st)+" "+(it?it.unit||"":"");
@@ -820,6 +1027,7 @@ function transferForm(e){
   upd();
   document.getElementById("f").onsubmit=function(ev){
     ev.preventDefault();
+    if (!val("fitem")){ alert("Choose an item."); return; }
     if (val("ffrom")===val("fto2")){ alert("Choose two different sites."); return; }
     var rec = isEdit ? e : {id:uid(),t:"T"};
     rec.date=val("fdate"); rec.from=val("ffrom"); rec.to=val("fto2");
@@ -842,11 +1050,21 @@ function ledgerModal(itemId){
   else {
     h+='<div class="ledwrap"><table class="led"><tr><th>Date · particulars</th><th>In</th><th>Out</th><th>Balance</th></tr>';
     rows.forEach(function(x){
-      var e=x.e, part;
-      if (e.t==="P") part=esc(e.supplier||"Purchase")+(e.inv?' <span class="sm">Inv '+esc(e.inv)+'</span>':'')+' <span class="sm">'+fmtMoney(e.rate)+'/'+esc(it.unit||"unit")+' · '+esc(siteName(e.site))+'</span>';
-      else if (e.t==="I") part='Issued'+(e.to?' to '+esc(e.to):'')+' <span class="sm">'+esc([e.purpose,e.slip?'Slip '+e.slip:''].filter(Boolean).join(" · "))+(e.purpose||e.slip?' · ':'')+esc(siteName(e.site))+'</span>';
-      else part='Transfer <span class="sm">'+esc(siteName(e.from))+' → '+esc(siteName(e.to))+'</span>';
-      h+='<tr><td class="part"><span class="sm" style="color:var(--ink)">'+fmtDate(e.date)+'</span>'+part+'</td>'
+      var part, e;
+      if (x.x.kind==="M"){
+        var m=x.x.m, L=x.x.line;
+        part=esc(m.no||"MRN")+(m.supplier?' · '+esc(m.supplier):'')
+          +(m.inv?' <span class="sm">Inv '+esc(m.inv)+'</span>':'')
+          +' <span class="sm">'+fmtMoney(L.rate)+'/'+esc(it.unit||"unit")+' · '+esc(siteName(m.site))+'</span>';
+      } else if (x.x.kind==="I"){
+        e=x.x.e;
+        part='Issued'+(e.to?' to '+esc(e.to):'')+' <span class="sm">'+esc([e.purpose,e.slip?'Slip '+e.slip:''].filter(Boolean).join(" · "))+(e.purpose||e.slip?' · ':'')+esc(siteName(e.site))+'</span>';
+      } else {
+        e=x.x.e;
+        part='Transfer <span class="sm">'+esc(siteName(e.from))+' → '+esc(siteName(e.to))+'</span>';
+      }
+      var date = x.x.kind==="M" ? x.x.m.date : x.x.e.date;
+      h+='<tr><td class="part"><span class="sm" style="color:var(--ink)">'+fmtDate(date)+'</span>'+part+'</td>'
         +'<td class="num" style="color:var(--green)">'+(x.delta>0?fmtQty(x.delta):"")+'</td>'
         +'<td class="num" style="color:var(--red)">'+(x.delta<0?fmtQty(-x.delta):"")+'</td>'
         +'<td class="num"><b>'+fmtQty(x.bal)+'</b></td></tr>';
@@ -872,26 +1090,29 @@ function downloadFile(name, text, mime){
   document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },400);
 }
-function inRange(e, from, to){
-  if (from && (e.date||"") < from) return false;
-  if (to && (e.date||"") > to) return false;
+function inRange(dt, from, to){
+  if (from && (dt||"") < from) return false;
+  if (to && (dt||"") > to) return false;
   return true;
 }
 function scopeTag(){ return S.site==="all" ? "all-sites" : siteName(S.site).replace(/[^\w-]+/g,"_"); }
 
-function exportReceipts(from,to){
-  var lines=[["Date","Site","Item","Unit","Qty","Rate","Amount","Supplier","Invoice No","PO No","Notes"].join(",")];
-  sortedEntries().forEach(function(e){
-    if (e.t!=="P" || !inScope(e) || !inRange(e,from,to)) return;
-    var it=itemById(e.item);
-    lines.push([e.date,siteName(e.site),itemName(e.item),it?it.unit||"":"",e.qty,e.rate,e.amount,e.supplier||"",e.inv||"",e.po||"",e.notes||""].map(csvCell).join(","));
+function exportMrns(from,to){
+  var lines=[["Date","MRN No","Site","Supplier","Invoice No","PO No","Item","Unit","Qty","Rate","Amount","Notes"].join(",")];
+  sortedMrns().forEach(function(m){
+    if (!mrnInScope(m) || !inRange(m.date,from,to)) return;
+    m.lines.forEach(function(L){
+      var it=itemById(L.item);
+      lines.push([m.date,m.no,siteName(m.site),m.supplier||"",m.inv||"",m.po||"",
+        itemName(L.item),it?it.unit||"":"",L.qty,L.rate,L.amount,m.notes||""].map(csvCell).join(","));
+    });
   });
-  downloadFile("receipts-"+scopeTag()+".csv", lines.join("\n"));
+  downloadFile("mrn-register-"+scopeTag()+".csv", lines.join("\n"));
 }
 function exportIssues(from,to){
   var lines=[["Date","Site","Item","Unit","Qty","Issued To","Purpose","Slip No","Authorised By","Notes"].join(",")];
   sortedEntries().forEach(function(e){
-    if (e.t!=="I" || !inScope(e) || !inRange(e,from,to)) return;
+    if (e.t!=="I" || !inScope(e) || !inRange(e.date,from,to)) return;
     var it=itemById(e.item);
     lines.push([e.date,siteName(e.site),itemName(e.item),it?it.unit||"":"",e.qty,e.to||"",e.purpose||"",e.slip||"",e.auth||"",e.notes||""].map(csvCell).join(","));
   });
@@ -909,14 +1130,26 @@ function exportStock(){
 }
 function exportLedger(itemId){
   var it=itemById(itemId);
-  var lines=[["Date","Type","Particulars","Site","In","Out","Balance"].join(",")];
+  var lines=[["Date","Type","Reference","Particulars","Site","In","Out","Balance"].join(",")];
   ledgerRows(itemId).forEach(function(x){
-    var e=x.e, type = e.t==="P"?"Receipt":e.t==="I"?"Issue":"Transfer";
-    var part = e.t==="P" ? [e.supplier,e.inv?"Inv "+e.inv:""].filter(Boolean).join(" ")
-             : e.t==="I" ? [e.to?"To "+e.to:"",e.purpose].filter(Boolean).join(" — ")
-             : siteName(e.from)+" to "+siteName(e.to);
-    var siteCol = e.t==="T" ? siteName(e.from)+" → "+siteName(e.to) : siteName(e.site);
-    lines.push([e.date,type,part,siteCol,x.delta>0?x.delta:"",x.delta<0?-x.delta:"",x.bal].map(csvCell).join(","));
+    var type, ref="", part, siteCol, date;
+    if (x.x.kind==="M"){
+      var m=x.x.m;
+      type="MRN"; ref=m.no||""; date=m.date;
+      part=[m.supplier,m.inv?"Inv "+m.inv:""].filter(Boolean).join(" ");
+      siteCol=siteName(m.site);
+    } else if (x.x.kind==="I"){
+      var e=x.x.e;
+      type="Issue"; ref=e.slip||""; date=e.date;
+      part=[e.to?"To "+e.to:"",e.purpose].filter(Boolean).join(" — ");
+      siteCol=siteName(e.site);
+    } else {
+      var t=x.x.e;
+      type="Transfer"; date=t.date;
+      part=siteName(t.from)+" to "+siteName(t.to);
+      siteCol=siteName(t.from)+" → "+siteName(t.to);
+    }
+    lines.push([date,type,ref,part,siteCol,x.delta>0?x.delta:"",x.delta<0?-x.delta:"",x.bal].map(csvCell).join(","));
   });
   downloadFile("ledger-"+(it?it.name.replace(/[^\w-]+/g,"_"):"item")+"-"+scopeTag()+".csv", lines.join("\n"));
 }
@@ -929,13 +1162,13 @@ function restore(file){
   r.onload=function(){
     try {
       var d=JSON.parse(r.result);
-      var payload = d && d.data && Array.isArray(d.data.sites) ? d.data
-                  : (d && Array.isArray(d.sites) ? d : null);
-      if (!payload || !Array.isArray(payload.items) || !Array.isArray(payload.entries)){
+      var payload = d && d.data ? migrate(d.data) : migrate(d);
+      if (!payload){
         alert("That file is not a STORE-REGISTER backup."); return;
       }
       if (!confirm("Replace everything on this device with the backup? ("
-        +payload.sites.length+" sites, "+payload.items.length+" items, "+payload.entries.length+" entries)")) return;
+        +payload.sites.length+" sites, "+payload.items.length+" items, "
+        +payload.mrns.length+" MRNs, "+payload.entries.length+" issue/transfer entries)")) return;
       data=payload; S.site="all"; save(); render();
     } catch(e){ alert("Could not read that file."); }
   };
