@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.3.29" />
+<meta name="app-version" content="1.3.30" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -440,7 +440,7 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const APP_VERSION = "1.3.29";
+const APP_VERSION = "1.3.30";
 const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
 const cmpVer = (a, b) => {
   const x = String(a || "").split(".").map(Number);
@@ -4786,7 +4786,8 @@ function Kpi({
   value,
   unit,
   alert,
-  onClick
+  onClick,
+  more
 }) {
   return React.createElement("div", {
     className: "dl-kpi" + (alert ? " alert" : "") + (onClick ? " tap" : ""),
@@ -4802,7 +4803,7 @@ function Kpi({
     className: "dl-kpiunit"
   }, unit), onClick && React.createElement("span", {
     className: "dl-kpimore"
-  }, "view detail →"));
+  }, more || "view detail →"));
 }
 function F({
   label,
@@ -4938,6 +4939,17 @@ function SiteDialog({
   }, initial ? "Save changes" : "Create site")));
 }
 const MTYPES = ["Routine service", "Repair", "Breakdown"];
+const openDoc = url => {
+  if (!url) return;
+  const u = /^https?:\/\//i.test(url) ? url : "https://" + url;
+  const a = document.createElement("a");
+  a.href = u;
+  if (!(/Android/.test(navigator.userAgent) && /; wv\)/.test(navigator.userAgent))) a.target = "_blank";
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+};
 function MaintPanel({
   machine,
   site,
@@ -4976,7 +4988,7 @@ function MaintPanel({
     if (days <= 30) return { v: days + " day(s)", u: "valid till " + dt, alert: true };
     return { v: "Valid", u: "till " + dt, alert: false };
   };
-  const docs = [["Insurance" + (machine.insNo ? " \u00b7 " + machine.insNo : ""), machine.insExp], ["Road tax", machine.taxUpto], ["Fitness certificate", machine.fitExp], ["PUC", machine.pucExp]];
+  const docs = [["Insurance" + (machine.insNo ? " \u00b7 " + machine.insNo : ""), machine.insExp, machine.insLink], ["Road tax", machine.taxUpto, machine.taxLink], ["Fitness certificate", machine.fitExp, machine.fitLink], ["PUC", machine.pucExp, machine.pucLink]];
   const submit = () => {
     if (!f.date) return setErr("Give the record a date.");
     if (!f.desc.trim()) return setErr("Describe what was done.");
@@ -5009,14 +5021,16 @@ function MaintPanel({
     onClick: onEdit
   }, "Edit documents"))), React.createElement("div", {
     className: "dl-kpis"
-  }, docs.map(([label, dt]) => {
+  }, docs.map(([label, dt, link]) => {
     const st = docState(dt);
     return React.createElement(Kpi, {
       key: label,
       label: label,
       value: st.v,
       unit: st.u,
-      alert: st.alert
+      alert: st.alert,
+      onClick: link ? () => openDoc(link) : undefined,
+      more: "open document \u2192"
     });
   })), React.createElement("div", {
     className: "dl-block"
@@ -5241,11 +5255,23 @@ function MachineDialog({
     value: m.insExp || "",
     onChange: e => set("insExp", e.target.value)
   })), React.createElement(F, {
+    label: "Insurance policy link (optional)"
+  }, React.createElement("input", {
+    value: m.insLink || "",
+    onChange: e => set("insLink", e.target.value),
+    placeholder: "paste Google Drive / DigiLocker link"
+  })), React.createElement(F, {
     label: "Road tax paid up to"
   }, React.createElement("input", {
     type: "date",
     value: m.taxUpto || "",
     onChange: e => set("taxUpto", e.target.value)
+  })), React.createElement(F, {
+    label: "Road tax receipt link (optional)"
+  }, React.createElement("input", {
+    value: m.taxLink || "",
+    onChange: e => set("taxLink", e.target.value),
+    placeholder: "paste Google Drive / DigiLocker link"
   })), React.createElement(F, {
     label: "Fitness valid till"
   }, React.createElement("input", {
@@ -5253,11 +5279,23 @@ function MachineDialog({
     value: m.fitExp || "",
     onChange: e => set("fitExp", e.target.value)
   })), React.createElement(F, {
+    label: "Fitness certificate link (optional)"
+  }, React.createElement("input", {
+    value: m.fitLink || "",
+    onChange: e => set("fitLink", e.target.value),
+    placeholder: "paste Google Drive / DigiLocker link"
+  })), React.createElement(F, {
     label: "PUC valid till"
   }, React.createElement("input", {
     type: "date",
     value: m.pucExp || "",
     onChange: e => set("pucExp", e.target.value)
+  })), React.createElement(F, {
+    label: "PUC certificate link (optional)"
+  }, React.createElement("input", {
+    value: m.pucLink || "",
+    onChange: e => set("pucLink", e.target.value),
+    placeholder: "paste Google Drive / DigiLocker link"
   }))), React.createElement(F, {
     label: "Fuel"
   }, React.createElement("select", {
