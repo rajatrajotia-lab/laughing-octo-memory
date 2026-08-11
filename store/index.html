@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.2.0" />
+<meta name="app-version" content="1.3.0" />
 <link rel="icon" href="icon-192.png" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -188,7 +188,7 @@ var store = (function () {
   };
 })();
 
-var VERSION = "1.2.0";
+var VERSION = "1.3.0";
 
 /* ---------------- data ----------------
    data.mrns    : [{id,no,date,site,supplier,inv,po,notes,
@@ -357,6 +357,7 @@ var TABS = [
   {id:"home",  label:"Overview"},
   {id:"mrn",   label:"MRN"},
   {id:"issue", label:"Issues"},
+  {id:"stock", label:"Stock"},
   {id:"items", label:"Items"},
   {id:"more",  label:"More"}
 ];
@@ -370,6 +371,7 @@ function render(){
   if (S.tab==="home")  { v.innerHTML = homeHTML();  setFab(false); }
   if (S.tab==="mrn")   { v.innerHTML = mrnListHTML(); setFab(true); }
   if (S.tab==="issue") { v.innerHTML = issueListHTML(); setFab(true); }
+  if (S.tab==="stock") { v.innerHTML = stockHTML(); setFab(false); }
   if (S.tab==="items") { v.innerHTML = itemsHTML(); setFab(true); }
   if (S.tab==="more")  { v.innerHTML = moreHTML();  setFab(false); bindMore(); }
   bindCommon();
@@ -547,28 +549,100 @@ function issueListHTML(){
   return h;
 }
 
-/* ---------------- items tab ---------------- */
+/* ---------------- stock register (develops from MRNs) ---------------- */
+function itemFlow(itemId, site){
+  var f={recv:0, iss:0, tin:0, tout:0};
+  data.mrns.forEach(function(m){
+    if (site!=="all" && m.site!==site) return;
+    m.lines.forEach(function(L){ if (L.item===itemId) f.recv += (+L.qty||0); });
+  });
+  data.entries.forEach(function(e){
+    if (e.item!==itemId) return;
+    if (e.t==="I"){ if (site==="all"||e.site===site) f.iss += (+e.qty||0); }
+    else if (e.t==="T" && site!=="all"){
+      if (e.to===site)   f.tin  += (+e.qty||0);
+      if (e.from===site) f.tout += (+e.qty||0);
+    }
+  });
+  return f;
+}
+function stockHTML(){
+  var q=(S.q||"").toLowerCase();
+  var list=data.items.slice().sort(function(a,b){ return a.name.toLowerCase()<b.name.toLowerCase()?-1:1; });
+  if (q) list=list.filter(function(it){ return (it.name+" "+(it.cat||"")).toLowerCase().indexOf(q)>=0; });
+
+  var rows=[], totValue=0, inStock=0, lowCount=0;
+  list.forEach(function(it){
+    var f=itemFlow(it.id,S.site);
+    var bal=f.recv - f.iss + f.tin - f.tout;
+    var r=avgRate(it.id), vl=bal*r;
+    if (bal>0) inStock++;
+    if (it.reorder>0 && bal<=it.reorder) lowCount++;
+    totValue+=vl;
+    rows.push({it:it,f:f,bal:bal,rate:r,value:vl});
+  });
+  /* items holding stock first, then the rest alphabetically */
+  rows.sort(function(a,b){
+    if ((a.bal>0)!==(b.bal>0)) return a.bal>0?-1:1;
+    return a.it.name.toLowerCase()<b.it.name.toLowerCase()?-1:1;
+  });
+
+  var h='<div class="toolrow">'
+    +'<input class="search" id="q" placeholder="Search stock…" value="'+esc(S.q)+'">'
+    +'<button class="btn ghost sm" id="bcsv">Stock CSV</button></div>';
+
+  if (!data.items.length || (!rows.length && q)){
+    h+='<div class="card"><div class="empty">'+(q?'No matches.'
+      :'Nothing here yet. Stock develops from MRNs — record a Material Receipt Note and the balance appears on this page.')+'</div></div>';
+    return h;
+  }
+
+  h+='<div class="tiles">'
+    +'<div class="tile"><div class="k">Stock value</div><div class="v num">'+fmtMoney(totValue)+'</div></div>'
+    +'<div class="tile"><div class="k">Items in stock</div><div class="v num">'+inStock+'<span style="font-size:12px;color:var(--mut);font-weight:400"> / '+rows.length+'</span></div></div>'
+    +'<div class="tile'+(lowCount?" warn":"")+'"><div class="k">Low stock</div><div class="v num">'+lowCount+'</div></div>'
+    +'</div>';
+
+  h+='<div class="card">';
+  rows.forEach(function(x){
+    var it=x.it, f=x.f, unit=esc(it.unit||"");
+    var lowChip = (it.reorder>0 && x.bal<=it.reorder) ? '<span class="chip low">LOW</span>' : '';
+    var flow='Received '+fmtQty(f.recv)+' · Issued '+fmtQty(f.iss);
+    if (S.site!=="all" && (f.tin||f.tout)){
+      if (f.tin)  flow+=' · Trf in '+fmtQty(f.tin);
+      if (f.tout) flow+=' · Trf out '+fmtQty(f.tout);
+    }
+    flow+=' · avg '+fmtMoney(x.rate)+'/'+(unit||'unit');
+    h+='<div class="row" data-led="'+it.id+'" style="cursor:pointer'+(x.bal>0?'':';opacity:.55')+'">'
+      +'<div class="rmain"><div class="rtitle">'+esc(it.name)+lowChip+'</div>'
+      +'<div class="rsub">'+flow+'</div></div>'
+      +'<div class="rqty"><div class="q num" style="color:'+(x.bal>0?"var(--navy)":"var(--mut)")+'">'+fmtQty(x.bal)+' '+unit+'</div>'
+      +'<div class="m num">'+fmtMoney(x.value)+'</div></div></div>';
+  });
+  h+='</div>';
+  h+='<div class="fhint" style="margin:2px 4px">Stock cannot be edited here — it develops only from MRNs, issue slips and transfers. Tap an item for its ledger.</div>';
+  return h;
+}
+
+/* ---------------- items tab (item master) ---------------- */
 function itemsHTML(){
   var q=(S.q||"").toLowerCase();
   var list=data.items.slice().sort(function(a,b){ return a.name.toLowerCase()<b.name.toLowerCase()?-1:1; });
   if (q) list=list.filter(function(it){ return (it.name+" "+(it.cat||"")).toLowerCase().indexOf(q)>=0; });
   var h='<div class="toolrow">'
-    +'<input class="search" id="q" placeholder="Search items…" value="'+esc(S.q)+'">'
-    +'<button class="btn ghost sm" id="bcsv">Stock CSV</button></div>';
+    +'<input class="search" id="q" placeholder="Search items…" value="'+esc(S.q)+'"></div>';
   if (!list.length){
-    h+='<div class="card"><div class="empty">'+(q?'No matches.':'No items yet. Tap + to add materials to the item master.')+'</div></div>';
+    h+='<div class="card"><div class="empty">'+(q?'No matches.':'No items yet. Tap + to add materials to the item master. Stock figures live on the Stock page.')+'</div></div>';
     return h;
   }
   h+='<div class="card">';
   list.forEach(function(it){
-    var st=stockOf(it.id,S.site), r=avgRate(it.id);
-    var lowChip = (it.reorder>0 && st<=it.reorder) ? '<span class="chip low">LOW</span>' : '';
+    var sub=[it.cat?esc(it.cat):"", it.loc?esc(it.loc):"",
+      it.reorder>0?('reorder at '+fmtQty(it.reorder)+' '+esc(it.unit||"")):""].filter(Boolean).join(" · ");
     h+='<div class="row" data-led="'+it.id+'" style="cursor:pointer">'
-      +'<div class="rmain"><div class="rtitle">'+esc(it.name)+lowChip+'</div>'
-      +'<div class="rsub">'+(it.cat?esc(it.cat)+" · ":"")+'avg '+fmtMoney(r)+'/'+esc(it.unit||"unit")
-      +(it.loc?' · '+esc(it.loc):'')+'</div></div>'
-      +'<div class="rqty"><div class="q num" style="color:'+(st>0?"var(--navy)":"var(--mut)")+'">'+fmtQty(st)+' '+esc(it.unit||"")+'</div>'
-      +'<div class="m num">'+fmtMoney(st*r)+'</div></div>'
+      +'<div class="rmain"><div class="rtitle">'+esc(it.name)+'</div>'
+      +'<div class="rsub">'+(sub||"—")+'</div></div>'
+      +'<div class="rqty"><div class="m">'+esc(it.unit||"")+'</div></div>'
       +'<button class="iconb" data-itemmenu="'+it.id+'">⋯</button></div>';
   });
   h+='</div>';
@@ -619,6 +693,7 @@ function bindCommon(){
     var scroll=window.scrollY;
     if (S.tab==="mrn") view.innerHTML=mrnListHTML();
     else if (S.tab==="issue") view.innerHTML=issueListHTML();
+    else if (S.tab==="stock") view.innerHTML=stockHTML();
     else if (S.tab==="items") view.innerHTML=itemsHTML();
     bindCommon(); window.scrollTo(0,scroll);
     var q2=document.getElementById("q"); q2.focus(); q2.setSelectionRange(q2.value.length,q2.value.length);
@@ -635,7 +710,7 @@ function bindCommon(){
   if (bcsv) bcsv.onclick=function(){
     if (S.tab==="mrn") exportMrns("","");
     else if (S.tab==="issue") exportIssues("","");
-    else exportStock();
+    else if (S.tab==="stock") exportStock();
   };
   document.querySelectorAll("[data-led]").forEach(function(el){
     el.onclick=function(ev){ if (ev.target.closest("[data-itemmenu]")) return; ledgerModal(el.getAttribute("data-led")); };
@@ -1133,12 +1208,13 @@ function exportIssues(from,to){
   downloadFile("issues-"+scopeTag()+".csv", lines.join("\n"));
 }
 function exportStock(){
-  var lines=[["Item","Unit","Category","Location","Stock","Avg Rate","Value","Reorder Level","Status"].join(",")];
+  var lines=[["Item","Unit","Category","Location","Received","Issued","Trf In","Trf Out","Stock","Avg Rate","Value","Reorder Level","Status"].join(",")];
   data.items.slice().sort(function(a,b){return a.name.toLowerCase()<b.name.toLowerCase()?-1:1;})
     .forEach(function(it){
-      var st=stockOf(it.id,S.site), r=avgRate(it.id);
+      var f=itemFlow(it.id,S.site);
+      var st=f.recv-f.iss+f.tin-f.tout, r=avgRate(it.id);
       var status = it.reorder>0 && st<=it.reorder ? "LOW" : "";
-      lines.push([it.name,it.unit||"",it.cat||"",it.loc||"",st,r?r.toFixed(2):"",(st*r).toFixed(2),it.reorder||"",status].map(csvCell).join(","));
+      lines.push([it.name,it.unit||"",it.cat||"",it.loc||"",f.recv,f.iss,f.tin||"",f.tout||"",st,r?r.toFixed(2):"",(st*r).toFixed(2),it.reorder||"",status].map(csvCell).join(","));
     });
   downloadFile("stock-"+scopeTag()+".csv", lines.join("\n"));
 }
