@@ -171,6 +171,9 @@ function createHub(appDir, dataFile, updateFile) {
       } else if (req.method === "POST" && url === "/api/set") {
         const b = JSON.parse(await readBody(req));
         if (typeof b.key !== "string" || typeof b.value !== "string") return json(res, 400, { error: "bad request" });
+        /* An identical save must not look like a change, or idle clients
+           reload each other for ever. */
+        if (store.data[b.key] === b.value) return json(res, 200, { rev: store.rev });
         store.data[b.key] = b.value;
         store.rev++;
         save();
