@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.3.32" />
+<meta name="app-version" content="1.3.33" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -440,7 +440,7 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const APP_VERSION = "1.3.32";
+const APP_VERSION = "1.3.33";
 const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
 const cmpVer = (a, b) => {
   const x = String(a || "").split(".").map(Number);
@@ -513,6 +513,15 @@ const blankEntry = () => ({
   work: "",
   remarks: ""
 });
+if (typeof window !== "undefined" && window.__hubStorage && typeof window.fetch === "function") {
+  const realFetch = window.fetch.bind(window);
+  window.fetch = (u, o) => {
+    if (typeof u === "string" && u.replace(/^\.\//, "").split("?")[0] === "api/rev") {
+      return Promise.reject(new Error("auto-refresh disabled"));
+    }
+    return realFetch(u, o);
+  };
+}
 const emptyData = () => ({
   rate: 92,
   rateP: 105,
@@ -1018,6 +1027,135 @@ function importKSDP(d) {
   d.focusSite = d.sites[0] && d.sites[0].id;
   return d;
 }
+function mergeShared(base, ours, hub) {
+  const deep = x => JSON.parse(JSON.stringify(x));
+  if (!hub) return deep(ours);
+  const b = base || {};
+  const j = x => JSON.stringify(x);
+  const pick3 = (bv, ov, hv) => {
+    const has = v => v !== undefined;
+    if (has(ov) && has(hv)) return j(ov) === j(bv) ? deep(hv) : deep(ov);
+    if (has(ov)) return j(ov) === j(bv) && has(bv) ? undefined : deep(ov);
+    if (has(hv)) return has(bv) ? undefined : deep(hv);
+    return undefined;
+  };
+  const merged = deep(ours);
+  ["rate", "rateP", "device"].forEach(k => {
+    const v = pick3(b[k], ours[k], hub[k]);
+    if (v === undefined) delete merged[k];else merged[k] = v;
+  });
+  merged.imports = {
+    ...(hub.imports || {}),
+    ...(ours.imports || {})
+  };
+  const stripM = s => {
+    const c = {
+      ...s
+    };
+    delete c.machines;
+    return c;
+  };
+  const siteMapOf = d => {
+    const m = {};
+    (d && d.sites || []).forEach(s => m[s.id] = s);
+    return m;
+  };
+  const bS = siteMapOf(b),
+    oS = siteMapOf(ours),
+    hS = siteMapOf(hub);
+  const machMapOf = d => {
+    const m = {};
+    (d && d.sites || []).forEach(s => (s.machines || []).forEach(x => m[x.id] = {
+      m: x,
+      siteId: s.id
+    }));
+    return m;
+  };
+  const bM = machMapOf(b),
+    oM = machMapOf(ours),
+    hM = machMapOf(hub);
+  const siteIds = new Set([...Object.keys(bS), ...Object.keys(oS), ...Object.keys(hS)]);
+  merged.sites = [];
+  const mergedSiteMap = {};
+  siteIds.forEach(id => {
+    const props = pick3(bS[id] && stripM(bS[id]), oS[id] && stripM(oS[id]), hS[id] && stripM(hS[id]));
+    if (props === undefined) return;
+    const s = {
+      ...props,
+      machines: []
+    };
+    merged.sites.push(s);
+    mergedSiteMap[id] = s;
+  });
+  const machIds = new Set([...Object.keys(bM), ...Object.keys(oM), ...Object.keys(hM)]);
+  machIds.forEach(id => {
+    const v = pick3(bM[id] && bM[id].m, oM[id] && oM[id].m, hM[id] && hM[id].m);
+    if (v === undefined) return;
+    const placement = oM[id] ? oM[id].siteId : hM[id] ? hM[id].siteId : bM[id].siteId;
+    const home = mergedSiteMap[placement] || merged.sites[0];
+    if (home) home.machines.push(v);
+  });
+  const mergeLists = (bl, ol, hl) => {
+    const mapOf = l => {
+      const m = {};
+      (l || []).forEach(x => x && x.id && (m[x.id] = x));
+      return m;
+    };
+    const bm = mapOf(bl),
+      om = mapOf(ol),
+      hm = mapOf(hl);
+    const ids = [...new Set([...Object.keys(om), ...Object.keys(hm), ...Object.keys(bm)])];
+    const out = [];
+    ids.forEach(id => {
+      const v = pick3(bm[id], om[id], hm[id]);
+      if (v !== undefined) out.push(v);
+    });
+    return out;
+  };
+  const liveMachine = {};
+  merged.sites.forEach(s => s.machines.forEach(m => liveMachine[m.id] = true));
+  merged.logs = {};
+  const logIds = new Set([...Object.keys(b.logs || {}), ...Object.keys(ours.logs || {}), ...Object.keys(hub.logs || {})]);
+  logIds.forEach(mid => {
+    if (!liveMachine[mid]) return;
+    merged.logs[mid] = mergeLists((b.logs || {})[mid], (ours.logs || {})[mid], (hub.logs || {})[mid]);
+  });
+  merged.maint = {};
+  const maintIds = new Set([...Object.keys(b.maint || {}), ...Object.keys(ours.maint || {}), ...Object.keys(hub.maint || {})]);
+  maintIds.forEach(mid => {
+    if (!liveMachine[mid]) return;
+    const l = mergeLists((b.maint || {})[mid], (ours.maint || {})[mid], (hub.maint || {})[mid]);
+    if (l.length) merged.maint[mid] = l;
+  });
+  merged.stock = {};
+  const stockIds = new Set([...Object.keys(b.stock || {}), ...Object.keys(ours.stock || {}), ...Object.keys(hub.stock || {})]);
+  stockIds.forEach(sid => {
+    if (!mergedSiteMap[sid]) return;
+    const ourMapIds = new Set(((ours.stock || {})[sid] || []).map(x => x.id));
+    const l = mergeLists((b.stock || {})[sid], (ours.stock || {})[sid], (hub.stock || {})[sid]);
+    const seen = {};
+    const out = [];
+    l.forEach(day => {
+      const key = day.date + "|" + (day.fuel || "HSD");
+      const prev = seen[key];
+      if (prev === undefined) {
+        seen[key] = out.length;
+        out.push(day);
+      } else if (ourMapIds.has(day.id)) {
+        out[prev] = day;
+      }
+    });
+    merged.stock[sid] = out;
+  });
+  merged.locks = {};
+  const lockKeys = new Set([...Object.keys(b.locks || {}), ...Object.keys(ours.locks || {}), ...Object.keys(hub.locks || {})]);
+  lockKeys.forEach(k => {
+    const v = pick3((b.locks || {})[k], (ours.locks || {})[k], (hub.locks || {})[k]);
+    if (v !== undefined) merged.locks[k] = v;
+  });
+  return merged;
+}
+if (typeof window !== "undefined") window.__testMerge = mergeShared;
 const BUNDLE_FORMAT = "fuel-register/1";
 function exportBundle(data, siteId) {
   const deep = x => JSON.parse(JSON.stringify(x));
@@ -1261,6 +1399,10 @@ function DieselLogbook() {
     if (!loaded) return;
     const payload = JSON.stringify(data);
     if (payload === lastSaved.current) return;
+    if (window.__hubStorage) {
+      setSaveState("dirty");
+      return;
+    }
     clearTimeout(saveTimer.current);
     setSaveState("pending");
     saveTimer.current = setTimeout(async () => {
@@ -1295,9 +1437,25 @@ function DieselLogbook() {
     clearTimeout(saveTimer.current);
     setSaveState("saving");
     try {
-      const payload = JSON.stringify(data);
+      let toSave = data;
+      if (window.__hubStorage) {
+        try {
+          const r = await fetch("api/all", {
+            cache: "no-store"
+          });
+          const all = await r.json();
+          const raw = (all.data || {})[STORE_KEY];
+          if (raw && raw !== lastSaved.current) {
+            const hubD = JSON.parse(raw);
+            const baseD = lastSaved.current ? JSON.parse(lastSaved.current) : null;
+            toSave = mergeShared(baseD, data, hubD);
+          }
+        } catch (e) { /* hub unreachable right now; save ours as-is */ }
+      }
+      const payload = JSON.stringify(toSave);
       await window.storage.set(STORE_KEY, payload);
       lastSaved.current = payload;
+      if (toSave !== data) setData(toSave);
       setSaveState("saved");
       setSavedAt(new Date());
       return true;
@@ -2230,7 +2388,7 @@ function DieselLogbook() {
     title: saveState === "error" ? "This device is not accepting saved data — click to retry" : "Click to save now" + (savedAt ? " · last saved " + savedAt.toLocaleTimeString() : "")
   }, React.createElement("span", {
     className: "dl-savedot"
-  }), saveState === "error" ? "Not saved" : saveState === "saved" ? savedAt ? React.createElement(React.Fragment, null, "Saved", React.createElement("span", {
+  }), saveState === "error" ? "Not saved" : saveState === "dirty" ? "Unsaved — press Save" : saveState === "saved" ? savedAt ? React.createElement(React.Fragment, null, "Saved", React.createElement("span", {
     className: "dl-savedtime"
   }, "\u00a0" + savedAt.toLocaleTimeString([], {
     hour: "2-digit",
@@ -6786,6 +6944,8 @@ const css = `
 .dl-save{display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.05em;
   text-transform:uppercase;color:var(--steel);font-weight:600;padding:8px 4px;white-space:nowrap;}
 .dl-savedot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex-shrink:0;}
+.dl-save.dirty{color:var(--amber-dk);font-weight:700;}
+.dl-save.dirty .dl-savedot{background:var(--amber);}
 .dl-save.pending .dl-savedot,.dl-save.saving .dl-savedot{background:var(--watch);
   animation:dlPulse 1s ease-in-out infinite;}
 .dl-save.error{color:var(--over);font-weight:700;}

@@ -151,8 +151,10 @@ jobs:
             ### Share data on the same WiFi
             The Windows/Mac app acts as a data hub: start it on your main computer and a bar
             at the bottom shows an address like `http://192.168.1.5:8785` — open it in a
-            browser on any device **on the same WiFi** for the same live data. If Windows
-            asks for network permission on first launch, click **Allow**.
+            browser on any device **on the same WiFi**. Each device presses **Save** to send
+            its work to the hub (entries from other devices are combined in automatically),
+            and **↻ Refresh** to pull in what others have saved. Nothing refreshes on its
+            own. If Windows asks for network permission on first launch, click **Allow**.
 
             The app works fully offline. Each installation keeps its own data; use the
             in-app Data Transfer screen to move records between systems.

@@ -2,7 +2,7 @@
    All devices talking to this server see the same data. */
 (function () {
   window.__hubStorage = true;
-  var mem = {}, rev = 0, lastTouch = Date.now();
+  var mem = {}, rev = 0;
 
   function j(url, opts) {
     return fetch(url, opts).then(function (r) {
@@ -16,18 +16,8 @@
     rev = s.rev || 0;
   });
 
-  ["keydown", "pointerdown", "touchstart"].forEach(function (ev) {
-    window.addEventListener(ev, function () { lastTouch = Date.now(); }, true);
-  });
-
-  /* Pick up entries made on other devices: reload when the hub's data has
-     changed and this device has been idle for a while (so we never
-     interrupt someone mid-entry). */
-  setInterval(function () {
-    j("api/rev").then(function (s) {
-      if (s.rev !== rev && Date.now() - lastTouch > 10000) location.reload();
-    }).catch(function () { /* hub briefly unreachable; try again */ });
-  }, 3000);
+  /* No automatic reloads: every device pushes with Save and pulls the
+     others' work only when it refreshes itself. */
 
   function post(url, body) {
     return j(url, {
