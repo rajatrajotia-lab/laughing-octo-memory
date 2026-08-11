@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>STORE-REGISTER</title>
+
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#12294A" />
+<meta name="app-version" content="1.0.0" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="STORE-REGISTER" />
+<meta name="mobile-web-app-capable" content="yes" />
+
+<style>
+  :root{
+    --navy:#12294A; --navy2:#1B3A66; --ink:#22344E; --mut:#5B7192;
+    --bg:#EDF0F4; --card:#FFFFFF; --line:#D8DFE8;
+    --accent:#C86A15; --green:#1E7A4F; --red:#B23A2F; --amber:#A36200;
+    --chipbg:#E7EDF5;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);-webkit-text-size-adjust:100%;
+    overscroll-behavior-y:none;}
+  body{font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);}
+  .num{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;}
+
+  #memwarn{background:#FBEBCF;border-bottom:2px solid var(--amber);color:var(--navy);
+    font:12px/1.5 system-ui,sans-serif;padding:9px 14px;display:none;}
+
+  /* ---------- header ---------- */
+  header{background:var(--navy);color:#fff;position:sticky;top:0;z-index:30;
+    padding-top:env(safe-area-inset-top);}
+  .hrow{display:flex;align-items:center;gap:10px;padding:10px 14px;max-width:980px;margin:0 auto;}
+  .brand{font-weight:700;font-size:16px;letter-spacing:.4px;white-space:nowrap;}
+  .brand small{font-weight:400;opacity:.65;font-size:11px;margin-left:6px;}
+  .hspacer{flex:1;}
+  select.sitesel{background:var(--navy2);color:#fff;border:1px solid rgba(255,255,255,.25);
+    border-radius:8px;padding:6px 8px;font-size:13px;max-width:170px;}
+
+  /* ---------- tab bar ---------- */
+  nav{background:var(--navy);position:sticky;top:0;z-index:29;}
+  .tabs{display:flex;max-width:980px;margin:0 auto;overflow-x:auto;}
+  .tab{flex:1;min-width:70px;text-align:center;color:rgba(255,255,255,.72);padding:9px 4px 11px;
+    font-size:12.5px;cursor:pointer;border-bottom:3px solid transparent;user-select:none;white-space:nowrap;}
+  .tab.on{color:#fff;border-bottom-color:var(--accent);font-weight:600;}
+
+  main{max-width:980px;margin:0 auto;padding:14px 12px 90px;
+    padding-bottom:calc(90px + env(safe-area-inset-bottom));}
+
+  /* ---------- cards / layout ---------- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:14px;margin-bottom:12px;}
+  .card h2{font-size:14px;margin:0 0 10px;color:var(--navy);}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px;}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;}
+  .tile .k{font-size:11.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;}
+  .tile .v{font-size:19px;font-weight:700;color:var(--navy);margin-top:3px;}
+  .tile.warn .v{color:var(--red);}
+
+  .row{display:flex;align-items:center;gap:10px;padding:10px 2px;border-top:1px solid var(--line);}
+  .row:first-of-type{border-top:none;}
+  .rmain{flex:1;min-width:0;}
+  .rtitle{font-weight:600;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rsub{font-size:12px;color:var(--mut);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rqty{text-align:right;white-space:nowrap;}
+  .rqty .q{font-weight:700;}
+  .rqty .m{font-size:11.5px;color:var(--mut);}
+  .in .q{color:var(--green);} .out .q{color:var(--red);} .tr .q{color:var(--navy2);}
+
+  .chip{display:inline-block;background:var(--chipbg);color:var(--navy);border-radius:20px;
+    padding:2px 9px;font-size:11.5px;margin-left:6px;vertical-align:1px;}
+  .chip.low{background:#F7E2DE;color:var(--red);font-weight:600;}
+  .chip.ok{background:#DFF0E7;color:var(--green);}
+
+  button{font:inherit;cursor:pointer;}
+  .btn{background:var(--navy);color:#fff;border:none;border-radius:9px;padding:9px 16px;font-weight:600;}
+  .btn.acc{background:var(--accent);}
+  .btn.ghost{background:#fff;color:var(--navy);border:1px solid var(--line);}
+  .btn.danger{background:var(--red);}
+  .btn.sm{padding:6px 11px;font-size:12.5px;border-radius:8px;}
+  .iconb{background:none;border:none;color:var(--mut);font-size:18px;padding:4px 8px;line-height:1;}
+
+  .addfab{position:fixed;right:18px;bottom:calc(20px + env(safe-area-inset-bottom));z-index:25;
+    background:var(--accent);color:#fff;border:none;border-radius:50%;width:56px;height:56px;
+    font-size:28px;line-height:1;box-shadow:0 4px 14px rgba(0,0,0,.25);}
+
+  .toolrow{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
+  input.search{flex:1;min-width:140px;border:1px solid var(--line);border-radius:9px;
+    padding:8px 11px;font:inherit;background:#fff;}
+
+  .empty{color:var(--mut);text-align:center;padding:28px 10px;font-size:13px;}
+
+  /* ---------- forms / modal ---------- */
+  #ovl{position:fixed;inset:0;background:rgba(10,20,38,.55);z-index:50;display:none;
+    overflow-y:auto;padding:18px 10px calc(18px + env(safe-area-inset-bottom));}
+  #ovl.show{display:block;}
+  .modal{background:#fff;border-radius:14px;max-width:560px;margin:0 auto;padding:16px 16px 18px;}
+  .modal h2{margin:0 0 14px;font-size:16px;color:var(--navy);}
+  .fg{margin-bottom:11px;}
+  .fg label{display:block;font-size:12px;color:var(--mut);margin-bottom:4px;font-weight:600;}
+  .fg input,.fg select,.fg textarea{width:100%;border:1px solid var(--line);border-radius:9px;
+    padding:9px 11px;font:inherit;background:#fff;color:var(--ink);}
+  .fg textarea{resize:vertical;min-height:54px;}
+  .f2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .f3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .factions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;}
+  .fhint{font-size:12px;color:var(--mut);margin-top:3px;}
+  .warnbox{background:#FBEBCF;border:1px solid #E6C98F;color:#5C4200;border-radius:9px;
+    padding:8px 11px;font-size:12.5px;margin-bottom:11px;}
+
+  /* ---------- ledger table ---------- */
+  table.led{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.led th{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;
+    text-align:right;padding:6px 6px;border-bottom:2px solid var(--line);}
+  table.led th:first-child,table.led td:first-child{text-align:left;}
+  table.led td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top;}
+  table.led td.part{text-align:left;max-width:160px;}
+  table.led td .sm{display:block;font-size:11px;color:var(--mut);}
+  .ledwrap{overflow-x:auto;}
+
+  .menu{position:absolute;background:#fff;border:1px solid var(--line);border-radius:10px;
+    box-shadow:0 6px 20px rgba(0,0,0,.18);z-index:60;min-width:150px;overflow:hidden;}
+  .menu button{display:block;width:100%;text-align:left;background:none;border:none;
+    padding:10px 14px;font-size:13.5px;color:var(--ink);}
+  .menu button:hover{background:var(--chipbg);}
+  .menu button.danger{color:var(--red);}
+
+  .seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-bottom:10px;}
+  .seg button{flex:1;background:#fff;border:none;padding:8px 4px;font-size:12.5px;color:var(--mut);}
+  .seg button.on{background:var(--navy);color:#fff;font-weight:600;}
+
+  @media (min-width:700px){
+    .addfab{right:calc(50% - 470px);}
+  }
+</style>
+</head>
+<body>
+<div id="memwarn">
+  This browser will not let the page save anything, so entries will be lost when it closes.
+  Save the file to the device and open it in Chrome or Safari rather than inside another app.
+</div>
+
+<header>
+  <div class="hrow">
+    <div class="brand">STORE-REGISTER<small id="ver"></small></div>
+    <div class="hspacer"></div>
+    <select class="sitesel" id="sitesel" aria-label="Site"></select>
+  </div>
+</header>
+<nav><div class="tabs" id="tabs"></div></nav>
+<main id="view"></main>
+<button class="addfab" id="fab" title="Add entry" style="display:none">+</button>
+<div id="ovl"></div>
+
+<script>
+"use strict";
+/* =============================================================
+   STORE-REGISTER — site store record keeping.
+   Item master, purchase receipts (GRN), issue slips, transfers,
+   stores ledger, low-stock alerts, CSV / JSON export.
+   ============================================================= */
+
+/* ---- storage: the browser's own, with memory as a last resort ---- */
+var store = (function () {
+  var P = "storereg:", mem = {}, live = true;
+  try { window.localStorage.setItem(P+"__t","1"); window.localStorage.removeItem(P+"__t"); }
+  catch (e) { live = false; var w = document.getElementById("memwarn"); if (w) w.style.display = "block"; }
+  return {
+    get: function (k) { return live ? window.localStorage.getItem(P+k) : (k in mem ? mem[k] : null); },
+    set: function (k,v) { if (live) { try { window.localStorage.setItem(P+k,v); } catch(e){ alert("Could not save — storage is full."); } } else mem[k]=v; },
+    live: live
+  };
+})();
+
+var VERSION = "1.0.0";
+
+/* ---------------- data ---------------- */
+var data = loadData();
+function blankData(){ return { v:1, sites:[], items:[], entries:[] }; }
+function loadData(){
+  try {
+    var raw = store.get("data");
+    if (!raw) return blankData();
+    var d = JSON.parse(raw);
+    if (!d || !Array.isArray(d.sites) || !Array.isArray(d.items) || !Array.isArray(d.entries)) return blankData();
+    return d;
+  } catch (e) { return blankData(); }
+}
+function save(){ store.set("data", JSON.stringify(data)); }
+
+var S = { tab: "home", site: store.get("site") || "all", q: "" };
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function today(){ var d=new Date(),p=function(n){return (n<10?"0":"")+n;}; return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate()); }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
+
+function siteById(id){ for (var i=0;i<data.sites.length;i++) if (data.sites[i].id===id) return data.sites[i]; return null; }
+function itemById(id){ for (var i=0;i<data.items.length;i++) if (data.items[i].id===id) return data.items[i]; return null; }
+function siteName(id){ var s=siteById(id); return s?s.name:"(deleted site)"; }
+function itemName(id){ var it=itemById(id); return it?it.name:"(deleted item)"; }
+
+/* ---------------- formatting ---------------- */
+function fmtQty(n){
+  n = +n || 0;
+  return n.toLocaleString("en-IN",{maximumFractionDigits:3});
+}
+function fmtMoney(n){
+  n = +n || 0;
+  return "₹" + n.toLocaleString("en-IN",{minimumFractionDigits:0,maximumFractionDigits:2});
+}
+function fmtDate(iso){
+  if (!iso) return "";
+  var p = iso.split("-");
+  if (p.length!==3) return iso;
+  var M=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return (+p[2]) + " " + (M[+p[1]-1]||p[1]) + " " + p[0];
+}
+
+/* ---------------- stock math ---------------- */
+/* Entry shapes:
+   {id,t:"P",date,site,item,qty,rate,amount,supplier,inv,po,notes}
+   {id,t:"I",date,site,item,qty,to,purpose,slip,auth,notes}
+   {id,t:"T",date,from,to,item,qty,notes}                        */
+
+function stockOf(itemId, site){        /* site = site id or "all" */
+  var s = 0, e, i;
+  for (i=0;i<data.entries.length;i++){
+    e = data.entries[i];
+    if (e.item !== itemId) continue;
+    if (e.t === "P"){ if (site==="all" || e.site===site) s += (+e.qty||0); }
+    else if (e.t === "I"){ if (site==="all" || e.site===site) s -= (+e.qty||0); }
+    else if (e.t === "T"){
+      if (site==="all") continue;                    /* net zero overall */
+      if (e.to===site)   s += (+e.qty||0);
+      if (e.from===site) s -= (+e.qty||0);
+    }
+  }
+  return s;
+}
+function avgRate(itemId){              /* weighted average purchase rate (all sites) */
+  var q=0,a=0,e,i;
+  for (i=0;i<data.entries.length;i++){
+    e=data.entries[i];
+    if (e.t==="P" && e.item===itemId){ q += (+e.qty||0); a += (+e.amount||0); }
+  }
+  return q>0 ? a/q : 0;
+}
+function entrySortKey(e){ return (e.date||"") + "|" + e.id; }
+function sortedEntries(){
+  return data.entries.slice().sort(function(a,b){
+    var ka=entrySortKey(a), kb=entrySortKey(b);
+    return ka<kb?-1:ka>kb?1:0;
+  });
+}
+function inScope(e){
+  if (S.site==="all") return true;
+  if (e.t==="T") return e.from===S.site || e.to===S.site;
+  return e.site===S.site;
+}
+function ledgerRows(itemId){
+  var rows=[], bal=0, all=sortedEntries(), e, i, delta;
+  for (i=0;i<all.length;i++){
+    e=all[i];
+    if (e.item!==itemId || !inScope(e)) continue;
+    delta = 0;
+    if (e.t==="P") delta = +e.qty||0;
+    else if (e.t==="I") delta = -(+e.qty||0);
+    else { /* transfer */
+      if (S.site==="all") continue;
+      delta = (e.to===S.site ? +e.qty||0 : 0) - (e.from===S.site ? +e.qty||0 : 0);
+    }
+    bal += delta;
+    rows.push({e:e, delta:delta, bal:bal});
+  }
+  return rows;
+}
+
+/* ---------------- tabs / render ---------------- */
+var TABS = [
+  {id:"home",  label:"Overview"},
+  {id:"rcpt",  label:"Receipts"},
+  {id:"issue", label:"Issues"},
+  {id:"items", label:"Items"},
+  {id:"more",  label:"More"}
+];
+
+function render(){
+  document.getElementById("ver").textContent = "v"+VERSION;
+  renderSiteSel();
+  renderTabs();
+  var v = document.getElementById("view");
+  if (!data.sites.length){ v.innerHTML = firstRunHTML(); bindFirstRun(); setFab(false); return; }
+  if (S.tab==="home")  { v.innerHTML = homeHTML();  setFab(false); }
+  if (S.tab==="rcpt")  { v.innerHTML = listHTML("P"); setFab(true); }
+  if (S.tab==="issue") { v.innerHTML = listHTML("I"); setFab(true); }
+  if (S.tab==="items") { v.innerHTML = itemsHTML(); setFab(true); }
+  if (S.tab==="more")  { v.innerHTML = moreHTML();  setFab(false); bindMore(); }
+  bindCommon();
+}
+function setFab(on){
+  var f=document.getElementById("fab");
+  f.style.display = on ? "block" : "none";
+}
+function renderTabs(){
+  var el=document.getElementById("tabs");
+  el.innerHTML = TABS.map(function(t){
+    return '<div class="tab'+(S.tab===t.id?" on":"")+'" data-tab="'+t.id+'">'+t.label+'</div>';
+  }).join("");
+  Array.prototype.forEach.call(el.children,function(c){
+    c.onclick=function(){ S.tab=c.getAttribute("data-tab"); S.q=""; render(); window.scrollTo(0,0); };
+  });
+}
+function renderSiteSel(){
+  var el=document.getElementById("sitesel");
+  var opts='<option value="all">All sites</option>';
+  data.sites.forEach(function(s){ opts+='<option value="'+s.id+'"'+(S.site===s.id?" selected":"")+'>'+esc(s.name)+'</option>'; });
+  el.innerHTML=opts;
+  if (S.site==="all") el.value="all";
+  el.onchange=function(){ S.site=el.value; store.set("site",S.site); render(); };
+}
+
+/* ---------------- first run ---------------- */
+function firstRunHTML(){
+  return '<div class="card" style="margin-top:26px;text-align:center;padding:30px 18px">'
+    +'<h2 style="font-size:17px">Start with a site</h2>'
+    +'<p style="color:var(--mut);max-width:380px;margin:8px auto 18px">Each store record — receipts, issues and stock — belongs to a site. Add your first site to begin.</p>'
+    +'<button class="btn acc" id="addsite0">Add a site</button></div>';
+}
+function bindFirstRun(){
+  document.getElementById("addsite0").onclick=function(){ siteForm(); };
+}
+
+/* ---------------- overview ---------------- */
+function homeHTML(){
+  var scopeItems = data.items.slice();
+  var totValue=0, low=[], stockCount=0;
+  scopeItems.forEach(function(it){
+    var st=stockOf(it.id,S.site);
+    if (st>0) stockCount++;
+    totValue += st*avgRate(it.id);
+    if (it.reorder>0 && st<=it.reorder) low.push({it:it,st:st});
+  });
+  var monthP=0, monthI=0, m=today().slice(0,7);
+  data.entries.forEach(function(e){
+    if (!inScope(e) || (e.date||"").slice(0,7)!==m) return;
+    if (e.t==="P") monthP += (+e.amount||0);
+    if (e.t==="I") monthI++;
+  });
+
+  var h='<div class="tiles">'
+    +'<div class="tile"><div class="k">Items in stock</div><div class="v num">'+stockCount+'<span style="font-size:12px;color:var(--mut);font-weight:400"> / '+scopeItems.length+'</span></div></div>'
+    +'<div class="tile"><div class="k">Stock value</div><div class="v num">'+fmtMoney(totValue)+'</div></div>'
+    +'<div class="tile"><div class="k">Purchases this month</div><div class="v num">'+fmtMoney(monthP)+'</div></div>'
+    +'<div class="tile'+(low.length?" warn":"")+'"><div class="k">Low stock</div><div class="v num">'+low.length+'</div></div>'
+    +'</div>';
+
+  if (low.length){
+    h+='<div class="card"><h2>Low stock — at or below reorder level</h2>';
+    low.sort(function(a,b){ return (a.st/(a.it.reorder||1)) - (b.st/(b.it.reorder||1)); });
+    low.forEach(function(x){
+      h+='<div class="row" data-led="'+x.it.id+'" style="cursor:pointer">'
+        +'<div class="rmain"><div class="rtitle">'+esc(x.it.name)+'</div>'
+        +'<div class="rsub">Reorder at '+fmtQty(x.it.reorder)+' '+esc(x.it.unit||"")+'</div></div>'
+        +'<div class="rqty out"><div class="q num">'+fmtQty(x.st)+' '+esc(x.it.unit||"")+'</div><div class="m">in stock</div></div></div>';
+    });
+    h+='</div>';
+  }
+
+  var recent = sortedEntries().filter(inScope).reverse().slice(0,8);
+  h+='<div class="card"><h2>Recent activity</h2>';
+  if (!recent.length) h+='<div class="empty">Nothing recorded yet. Use the Receipts tab to enter your first purchase.</div>';
+  recent.forEach(function(e){ h+=entryRowHTML(e,false); });
+  h+='</div>';
+  return h;
+}
+
+/* ---------------- entry rows & lists ---------------- */
+function entryRowHTML(e, withMenu){
+  var it=itemById(e.item), unit=it?it.unit||"":"";
+  var cls, qty, title, sub;
+  if (e.t==="P"){
+    cls="in"; qty="+"+fmtQty(e.qty)+" "+esc(unit);
+    title=esc(itemName(e.item));
+    sub=fmtDate(e.date)+" · "+esc(siteName(e.site))
+      +(e.supplier?" · "+esc(e.supplier):"")
+      +(e.inv?" · Inv "+esc(e.inv):"")
+      +" · "+fmtMoney(e.amount);
+  } else if (e.t==="I"){
+    cls="out"; qty="−"+fmtQty(e.qty)+" "+esc(unit);
+    title=esc(itemName(e.item));
+    sub=fmtDate(e.date)+" · "+esc(siteName(e.site))
+      +(e.to?" · to "+esc(e.to):"")
+      +(e.purpose?" · "+esc(e.purpose):"")
+      +(e.slip?" · Slip "+esc(e.slip):"");
+  } else {
+    cls="tr"; qty=fmtQty(e.qty)+" "+esc(unit);
+    title=esc(itemName(e.item));
+    sub=fmtDate(e.date)+" · "+esc(siteName(e.from))+" → "+esc(siteName(e.to));
+  }
+  return '<div class="row '+cls+'">'
+    +'<div class="rmain"><div class="rtitle">'+title+'</div><div class="rsub">'+sub+'</div></div>'
+    +'<div class="rqty '+cls+'"><div class="q num">'+qty+'</div></div>'
+    +(withMenu?'<button class="iconb" data-menu="'+e.id+'">⋯</button>':'')
+    +'</div>';
+}
+
+function listHTML(type){
+  var q=(S.q||"").toLowerCase();
+  var rows = sortedEntries().reverse().filter(function(e){
+    if (type==="P" && e.t!=="P") return false;
+    if (type==="I" && !(e.t==="I"||e.t==="T")) return false;
+    if (!inScope(e)) return false;
+    if (!q) return true;
+    var hay=(itemName(e.item)+" "+(e.supplier||"")+" "+(e.inv||"")+" "+(e.to||"")+" "+(e.purpose||"")+" "+(e.slip||"")+" "+(e.po||"")).toLowerCase();
+    return hay.indexOf(q)>=0;
+  });
+  var label = type==="P" ? "receipts" : "issues";
+  var h='<div class="toolrow">'
+    +'<input class="search" id="q" placeholder="Search '+label+'…" value="'+esc(S.q)+'">'
+    +(type==="I"?'<button class="btn ghost sm" id="btr">Transfer</button>':"")
+    +'<button class="btn ghost sm" id="bcsv">CSV</button></div>';
+  if (!rows.length){
+    h+='<div class="card"><div class="empty">'+(q?'No matches.':(type==="P"
+      ?'No receipts yet. Tap + to record a purchase — supplier, invoice number, quantity, rate.'
+      :'No issues yet. Tap + to record an issue slip — who took what, and for which work.'))+'</div></div>';
+    return h;
+  }
+  var totalAmt=0, totalCount=rows.length;
+  if (type==="P") rows.forEach(function(e){ totalAmt+=(+e.amount||0); });
+  h+='<div class="card">';
+  if (type==="P") h+='<div class="rsub" style="margin-bottom:6px">'+totalCount+' receipts · total '+fmtMoney(totalAmt)+'</div>';
+  rows.forEach(function(e){ h+=entryRowHTML(e,true); });
+  h+='</div>';
+  return h;
+}
+
+/* ---------------- items tab ---------------- */
+function itemsHTML(){
+  var q=(S.q||"").toLowerCase();
+  var list=data.items.slice().sort(function(a,b){ return a.name.toLowerCase()<b.name.toLowerCase()?-1:1; });
+  if (q) list=list.filter(function(it){ return (it.name+" "+(it.cat||"")).toLowerCase().indexOf(q)>=0; });
+  var h='<div class="toolrow">'
+    +'<input class="search" id="q" placeholder="Search items…" value="'+esc(S.q)+'">'
+    +'<button class="btn ghost sm" id="bcsv">Stock CSV</button></div>';
+  if (!list.length){
+    h+='<div class="card"><div class="empty">'+(q?'No matches.':'No items yet. Tap + to add materials to the item master.')+'</div></div>';
+    return h;
+  }
+  h+='<div class="card">';
+  list.forEach(function(it){
+    var st=stockOf(it.id,S.site), r=avgRate(it.id);
+    var lowChip = (it.reorder>0 && st<=it.reorder) ? '<span class="chip low">LOW</span>' : '';
+    h+='<div class="row" data-led="'+it.id+'" style="cursor:pointer">'
+      +'<div class="rmain"><div class="rtitle">'+esc(it.name)+lowChip+'</div>'
+      +'<div class="rsub">'+(it.cat?esc(it.cat)+" · ":"")+'avg '+fmtMoney(r)+'/'+esc(it.unit||"unit")
+      +(it.loc?' · '+esc(it.loc):'')+'</div></div>'
+      +'<div class="rqty"><div class="q num" style="color:'+(st>0?"var(--navy)":"var(--mut)")+'">'+fmtQty(st)+' '+esc(it.unit||"")+'</div>'
+      +'<div class="m num">'+fmtMoney(st*r)+'</div></div>'
+      +'<button class="iconb" data-itemmenu="'+it.id+'">⋯</button></div>';
+  });
+  h+='</div>';
+  return h;
+}
+
+/* ---------------- more tab ---------------- */
+function moreHTML(){
+  var h='<div class="card"><h2>Sites</h2>';
+  data.sites.forEach(function(s){
+    var used = data.entries.some(function(e){ return e.site===s.id||e.from===s.id||e.to===s.id; });
+    h+='<div class="row"><div class="rmain"><div class="rtitle">'+esc(s.name)+'</div></div>'
+      +'<button class="btn ghost sm" data-esite="'+s.id+'">Edit</button>'
+      +(used?'':'<button class="btn ghost sm" data-dsite="'+s.id+'" style="color:var(--red)">Delete</button>')
+      +'</div>';
+  });
+  h+='<div class="factions" style="justify-content:flex-start;margin-top:10px"><button class="btn sm" id="baddsite">Add a site</button></div></div>';
+
+  h+='<div class="card"><h2>Export</h2>'
+    +'<div class="f2" style="margin-bottom:10px">'
+    +'<div class="fg"><label>From</label><input type="date" id="expfrom"></div>'
+    +'<div class="fg"><label>To</label><input type="date" id="expto"></div></div>'
+    +'<div class="factions" style="justify-content:flex-start;margin-top:0;gap:8px">'
+    +'<button class="btn ghost sm" id="bexr">Receipts CSV</button>'
+    +'<button class="btn ghost sm" id="bexi">Issues CSV</button>'
+    +'<button class="btn ghost sm" id="bexs">Stock summary CSV</button></div>'
+    +'<div class="fhint">Exports respect the site selected at the top. Leave dates blank for everything.</div></div>';
+
+  h+='<div class="card"><h2>Backup</h2>'
+    +'<div class="factions" style="justify-content:flex-start;margin-top:0;gap:8px">'
+    +'<button class="btn sm" id="bbk">Download backup</button>'
+    +'<button class="btn ghost sm" id="brs">Restore from file</button>'
+    +'<input type="file" id="rsfile" accept=".json,application/json" style="display:none"></div>'
+    +'<div class="fhint">The backup file holds every site, item, receipt and issue. Keep one after each working day.</div></div>';
+
+  h+='<div class="card"><h2>Danger zone</h2>'
+    +'<button class="btn danger sm" id="bwipe">Erase all data</button>'
+    +'<div class="fhint">Removes everything on this device. Download a backup first.</div></div>';
+  return h;
+}
+
+/* ---------------- bindings ---------------- */
+function bindCommon(){
+  var q=document.getElementById("q");
+  if (q) q.oninput=function(){ S.q=q.value;
+    var view=document.getElementById("view");
+    var scroll=window.scrollY;
+    if (S.tab==="rcpt") view.innerHTML=listHTML("P");
+    else if (S.tab==="issue") view.innerHTML=listHTML("I");
+    else if (S.tab==="items") view.innerHTML=itemsHTML();
+    bindCommon(); window.scrollTo(0,scroll);
+    var q2=document.getElementById("q"); q2.focus(); q2.setSelectionRange(q2.value.length,q2.value.length);
+  };
+  var fab=document.getElementById("fab");
+  fab.onclick=function(){
+    if (S.tab==="rcpt") receiptForm();
+    else if (S.tab==="issue") issueForm();
+    else if (S.tab==="items") itemForm();
+  };
+  var btr=document.getElementById("btr");
+  if (btr) btr.onclick=function(){ transferForm(); };
+  var bcsv=document.getElementById("bcsv");
+  if (bcsv) bcsv.onclick=function(){
+    if (S.tab==="rcpt") exportReceipts("","");
+    else if (S.tab==="issue") exportIssues("","");
+    else exportStock();
+  };
+  document.querySelectorAll("[data-led]").forEach(function(el){
+    el.onclick=function(ev){ if (ev.target.closest("[data-itemmenu]")) return; ledgerModal(el.getAttribute("data-led")); };
+  });
+  document.querySelectorAll("[data-menu]").forEach(function(el){
+    el.onclick=function(ev){ ev.stopPropagation(); entryMenu(el, el.getAttribute("data-menu")); };
+  });
+  document.querySelectorAll("[data-itemmenu]").forEach(function(el){
+    el.onclick=function(ev){ ev.stopPropagation(); itemMenu(el, el.getAttribute("data-itemmenu")); };
+  });
+}
+function bindMore(){
+  document.getElementById("baddsite").onclick=function(){ siteForm(); };
+  document.querySelectorAll("[data-esite]").forEach(function(b){
+    b.onclick=function(){ siteForm(b.getAttribute("data-esite")); };
+  });
+  document.querySelectorAll("[data-dsite]").forEach(function(b){
+    b.onclick=function(){
+      var s=siteById(b.getAttribute("data-dsite"));
+      if (s && confirm('Delete site "'+s.name+'"?')){
+        data.sites=data.sites.filter(function(x){return x.id!==s.id;});
+        if (S.site===s.id) S.site="all";
+        save(); render();
+      }
+    };
+  });
+  document.getElementById("bexr").onclick=function(){ exportReceipts(val("expfrom"),val("expto")); };
+  document.getElementById("bexi").onclick=function(){ exportIssues(val("expfrom"),val("expto")); };
+  document.getElementById("bexs").onclick=function(){ exportStock(); };
+  document.getElementById("bbk").onclick=backup;
+  var rsf=document.getElementById("rsfile");
+  document.getElementById("brs").onclick=function(){ rsf.click(); };
+  rsf.onchange=function(){ if (rsf.files[0]) restore(rsf.files[0]); rsf.value=""; };
+  document.getElementById("bwipe").onclick=function(){
+    if (confirm("Erase ALL sites, items, receipts and issues on this device?")
+      && confirm("This cannot be undone. Really erase everything?")){
+      data=blankData(); S.site="all"; save(); render();
+    }
+  };
+}
+function val(id){ var el=document.getElementById(id); return el?el.value:""; }
+
+/* ---------------- menus ---------------- */
+var openMenu=null;
+function closeMenu(){ if (openMenu){ openMenu.remove(); openMenu=null; } }
+document.addEventListener("click",function(){ closeMenu(); });
+function showMenu(anchor, html){
+  closeMenu();
+  var m=document.createElement("div");
+  m.className="menu"; m.innerHTML=html;
+  document.body.appendChild(m);
+  var r=anchor.getBoundingClientRect();
+  m.style.top=(window.scrollY+r.bottom+4)+"px";
+  var left=window.scrollX+r.right-m.offsetWidth;
+  m.style.left=Math.max(8,left)+"px";
+  m.onclick=function(ev){ ev.stopPropagation(); };
+  openMenu=m;
+  return m;
+}
+function entryMenu(anchor,id){
+  var e=null; data.entries.forEach(function(x){ if (x.id===id) e=x; });
+  if (!e) return;
+  var m=showMenu(anchor,'<button data-a="e">Edit</button><button data-a="d" class="danger">Delete</button>');
+  m.querySelector('[data-a="e"]').onclick=function(){
+    closeMenu();
+    if (e.t==="P") receiptForm(e); else if (e.t==="I") issueForm(e); else transferForm(e);
+  };
+  m.querySelector('[data-a="d"]').onclick=function(){
+    closeMenu();
+    if (confirm("Delete this entry? Stock figures will change.")){
+      data.entries=data.entries.filter(function(x){return x.id!==id;});
+      save(); render();
+    }
+  };
+}
+function itemMenu(anchor,id){
+  var it=itemById(id); if (!it) return;
+  var used=data.entries.some(function(e){ return e.item===id; });
+  var m=showMenu(anchor,'<button data-a="l">Ledger</button><button data-a="e">Edit</button>'
+    +(used?'':'<button data-a="d" class="danger">Delete</button>'));
+  m.querySelector('[data-a="l"]').onclick=function(){ closeMenu(); ledgerModal(id); };
+  m.querySelector('[data-a="e"]').onclick=function(){ closeMenu(); itemForm(it); };
+  var d=m.querySelector('[data-a="d"]');
+  if (d) d.onclick=function(){
+    closeMenu();
+    if (confirm('Delete item "'+it.name+'"?')){
+      data.items=data.items.filter(function(x){return x.id!==id;});
+      save(); render();
+    }
+  };
+}
+
+/* ---------------- modal helpers ---------------- */
+function openModal(html){
+  var o=document.getElementById("ovl");
+  o.innerHTML='<div class="modal">'+html+'</div>';
+  o.classList.add("show");
+  o.onclick=function(ev){ if (ev.target===o) closeModal(); };
+}
+function closeModal(){
+  var o=document.getElementById("ovl");
+  o.classList.remove("show"); o.innerHTML="";
+}
+function siteOptions(sel){
+  return data.sites.map(function(s){
+    return '<option value="'+s.id+'"'+(sel===s.id?" selected":"")+'>'+esc(s.name)+'</option>';
+  }).join("");
+}
+function itemOptions(sel){
+  return data.items.slice().sort(function(a,b){ return a.name.toLowerCase()<b.name.toLowerCase()?-1:1; })
+    .map(function(it){ return '<option value="'+it.id+'"'+(sel===it.id?" selected":"")+'>'+esc(it.name)+(it.unit?" ("+esc(it.unit)+")":"")+'</option>'; }).join("");
+}
+function datalist(id, values){
+  var seen={}, out=[];
+  values.forEach(function(v){ v=(v||"").trim(); if (v && !seen[v.toLowerCase()]){ seen[v.toLowerCase()]=1; out.push(v); } });
+  return '<datalist id="'+id+'">'+out.map(function(v){return '<option value="'+esc(v)+'">';}).join("")+'</datalist>';
+}
+function defaultSite(){ return S.site!=="all" ? S.site : (data.sites[0]?data.sites[0].id:""); }
+
+/* ---------------- site form ---------------- */
+function siteForm(id){
+  var s=id?siteById(id):null;
+  openModal('<h2>'+(s?"Edit site":"Add a site")+'</h2>'
+    +'<form id="f"><div class="fg"><label>Site name</label>'
+    +'<input id="fname" required maxlength="60" value="'+(s?esc(s.name):"")+'" placeholder="e.g. Drill Site A"></div>'
+    +'<div class="factions"><button type="button" class="btn ghost" id="fcancel">Cancel</button>'
+    +'<button class="btn acc" type="submit">Save</button></div></form>');
+  document.getElementById("fcancel").onclick=closeModal;
+  document.getElementById("f").onsubmit=function(ev){
+    ev.preventDefault();
+    var name=val("fname").trim(); if (!name) return;
+    if (s) s.name=name;
+    else data.sites.push({id:uid(),name:name});
+    save(); closeModal(); render();
+  };
+  document.getElementById("fname").focus();
+}
+
+/* ---------------- item form ---------------- */
+function itemForm(it, onSaved){
+  var e=it||{};
+  openModal('<h2>'+(it?"Edit item":"New item")+'</h2><form id="f">'
+    +'<div class="fg"><label>Item name</label><input id="fname" required maxlength="80" value="'+esc(e.name||"")+'" placeholder="e.g. Cement OPC 53"></div>'
+    +'<div class="f3">'
+    +'<div class="fg"><label>Unit</label><input id="funit" maxlength="12" value="'+esc(e.unit||"")+'" placeholder="bag / kg / nos" list="dlunit"></div>'
+    +'<div class="fg"><label>Category</label><input id="fcat" maxlength="30" value="'+esc(e.cat||"")+'" placeholder="optional" list="dlcat"></div>'
+    +'<div class="fg"><label>Reorder level</label><input id="freo" type="number" min="0" step="any" value="'+(e.reorder>0?e.reorder:"")+'" placeholder="alert below"></div>'
+    +'</div>'
+    +'<div class="fg"><label>Bin / rack location</label><input id="floc" maxlength="40" value="'+esc(e.loc||"")+'" placeholder="optional, e.g. Rack B-3"></div>'
+    +'<div class="fg"><label>Notes</label><textarea id="fnotes" maxlength="300">'+esc(e.notes||"")+'</textarea></div>'
+    +datalist("dlunit",["bag","kg","ton","litre","nos","m","sqm","cum","box","roll","set","pair"])
+    +datalist("dlcat",data.items.map(function(x){return x.cat;}))
+    +'<div class="factions"><button type="button" class="btn ghost" id="fcancel">Cancel</button>'
+    +'<button class="btn acc" type="submit">Save</button></div></form>');
+  document.getElementById("fcancel").onclick=closeModal;
+  document.getElementById("f").onsubmit=function(ev){
+    ev.preventDefault();
+    var name=val("fname").trim(); if (!name) return;
+    var rec = it || {id:uid()};
+    rec.name=name; rec.unit=val("funit").trim(); rec.cat=val("fcat").trim();
+    rec.reorder=+val("freo")||0; rec.loc=val("floc").trim(); rec.notes=val("fnotes").trim();
+    if (!it) data.items.push(rec);
+    save(); closeModal();
+    if (onSaved) onSaved(rec.id); else render();
+  };
+  document.getElementById("fname").focus();
+}
+
+/* ---------------- receipt (purchase / GRN) form ---------------- */
+function receiptForm(e){
+  var isEdit=!!e; e=e||{};
+  if (!data.items.length && !isEdit){
+    itemForm(null,function(){ receiptForm(); });
+    return;
+  }
+  var suppliers=data.entries.filter(function(x){return x.t==="P";}).map(function(x){return x.supplier;});
+  openModal('<h2>'+(isEdit?"Edit receipt":"Material receipt")+'</h2><form id="f">'
+    +'<div class="f2">'
+    +'<div class="fg"><label>Date</label><input id="fdate" type="date" required value="'+esc(e.date||today())+'"></div>'
+    +'<div class="fg"><label>Site</label><select id="fsite" required>'+siteOptions(e.site||defaultSite())+'</select></div>'
+    +'</div>'
+    +'<div class="fg"><label>Item</label><div style="display:flex;gap:8px">'
+    +'<select id="fitem" required style="flex:1">'+itemOptions(e.item)+'</select>'
+    +'<button type="button" class="btn ghost sm" id="fnewitem">+ New</button></div></div>'
+    +'<div class="f3">'
+    +'<div class="fg"><label>Quantity</label><input id="fqty" type="number" min="0.0001" step="any" required value="'+(e.qty||"")+'"></div>'
+    +'<div class="fg"><label>Rate</label><input id="frate" type="number" min="0" step="any" required value="'+(e.rate||"")+'"></div>'
+    +'<div class="fg"><label>Amount</label><input id="famt" type="number" min="0" step="any" value="'+(e.amount||"")+'"><div class="fhint">auto = qty × rate</div></div>'
+    +'</div>'
+    +'<div class="fg"><label>Supplier</label><input id="fsup" maxlength="80" value="'+esc(e.supplier||"")+'" list="dlsup" placeholder="vendor name"></div>'
+    +'<div class="f2">'
+    +'<div class="fg"><label>Invoice / bill no.</label><input id="finv" maxlength="40" value="'+esc(e.inv||"")+'"></div>'
+    +'<div class="fg"><label>PO no.</label><input id="fpo" maxlength="40" value="'+esc(e.po||"")+'" placeholder="optional"></div>'
+    +'</div>'
+    +'<div class="fg"><label>Notes</label><textarea id="fnotes" maxlength="300">'+esc(e.notes||"")+'</textarea></div>'
+    +datalist("dlsup",suppliers)
+    +'<div class="factions"><button type="button" class="btn ghost" id="fcancel">Cancel</button>'
+    +'<button class="btn acc" type="submit">'+(isEdit?"Save changes":"Save receipt")+'</button></div></form>');
+  document.getElementById("fcancel").onclick=closeModal;
+  document.getElementById("fnewitem").onclick=function(){
+    itemForm(null,function(newId){ receiptForm(isEdit?e:undefined); var sel=document.getElementById("fitem"); if (sel) sel.value=newId; });
+  };
+  var qtyEl=document.getElementById("fqty"), rateEl=document.getElementById("frate"), amtEl=document.getElementById("famt");
+  var amtTouched=false;
+  amtEl.oninput=function(){ amtTouched=true; };
+  function recalc(){ if (!amtTouched){ var q=+qtyEl.value||0, r=+rateEl.value||0; amtEl.value = q&&r ? +(q*r).toFixed(2) : ""; } }
+  qtyEl.oninput=recalc; rateEl.oninput=recalc;
+  document.getElementById("f").onsubmit=function(ev){
+    ev.preventDefault();
+    var rec = isEdit ? e : {id:uid(),t:"P"};
+    rec.date=val("fdate"); rec.site=val("fsite"); rec.item=val("fitem");
+    rec.qty=+val("fqty"); rec.rate=+val("frate");
+    rec.amount=+val("famt")||+(rec.qty*rec.rate).toFixed(2);
+    rec.supplier=val("fsup").trim(); rec.inv=val("finv").trim(); rec.po=val("fpo").trim(); rec.notes=val("fnotes").trim();
+    if (!isEdit) data.entries.push(rec);
+    save(); closeModal(); render();
+  };
+}
+
+/* ---------------- issue slip form ---------------- */
+function issueForm(e){
+  var isEdit=!!e; e=e||{};
+  if (!data.items.length){ alert("Add an item and record a receipt first."); return; }
+  var tos=data.entries.filter(function(x){return x.t==="I";}).map(function(x){return x.to;});
+  var purposes=data.entries.filter(function(x){return x.t==="I";}).map(function(x){return x.purpose;});
+  openModal('<h2>'+(isEdit?"Edit issue":"Material issue")+'</h2><form id="f">'
+    +'<div id="stockwarn"></div>'
+    +'<div class="f2">'
+    +'<div class="fg"><label>Date</label><input id="fdate" type="date" required value="'+esc(e.date||today())+'"></div>'
+    +'<div class="fg"><label>Site</label><select id="fsite" required>'+siteOptions(e.site||defaultSite())+'</select></div>'
+    +'</div>'
+    +'<div class="fg"><label>Item</label><select id="fitem" required>'+itemOptions(e.item)+'</select>'
+    +'<div class="fhint" id="avail"></div></div>'
+    +'<div class="fg"><label>Quantity</label><input id="fqty" type="number" min="0.0001" step="any" required value="'+(e.qty||"")+'"></div>'
+    +'<div class="fg"><label>Issued to</label><input id="fto" maxlength="80" required value="'+esc(e.to||"")+'" list="dlto" placeholder="person / machine / contractor"></div>'
+    +'<div class="fg"><label>Purpose / work</label><input id="fpur" maxlength="120" value="'+esc(e.purpose||"")+'" list="dlpur" placeholder="e.g. foundation concreting"></div>'
+    +'<div class="f2">'
+    +'<div class="fg"><label>Slip no.</label><input id="fslip" maxlength="40" value="'+esc(e.slip||"")+'" placeholder="optional"></div>'
+    +'<div class="fg"><label>Authorised by</label><input id="fauth" maxlength="60" value="'+esc(e.auth||"")+'" placeholder="optional"></div>'
+    +'</div>'
+    +'<div class="fg"><label>Notes</label><textarea id="fnotes" maxlength="300">'+esc(e.notes||"")+'</textarea></div>'
+    +datalist("dlto",tos)+datalist("dlpur",purposes)
+    +'<div class="factions"><button type="button" class="btn ghost" id="fcancel">Cancel</button>'
+    +'<button class="btn acc" type="submit">'+(isEdit?"Save changes":"Save issue")+'</button></div></form>');
+  document.getElementById("fcancel").onclick=closeModal;
+  function checkStock(){
+    var itemId=val("fitem"), site=val("fsite"), q=+val("fqty")||0;
+    var st=stockOf(itemId,site);
+    if (isEdit && e.item===itemId && e.site===site) st += (+e.qty||0);   /* editing: exclude own old qty */
+    var it=itemById(itemId), unit=it?it.unit||"":"";
+    document.getElementById("avail").textContent = "Available at site: "+fmtQty(st)+" "+unit;
+    document.getElementById("stockwarn").innerHTML = (q>st)
+      ? '<div class="warnbox">Quantity exceeds the stock recorded at this site ('+fmtQty(st)+' '+esc(unit)+'). The entry will still be saved.</div>' : "";
+  }
+  ["fitem","fsite","fqty"].forEach(function(id){ document.getElementById(id).oninput=checkStock; document.getElementById(id).onchange=checkStock; });
+  checkStock();
+  document.getElementById("f").onsubmit=function(ev){
+    ev.preventDefault();
+    var rec = isEdit ? e : {id:uid(),t:"I"};
+    rec.date=val("fdate"); rec.site=val("fsite"); rec.item=val("fitem");
+    rec.qty=+val("fqty"); rec.to=val("fto").trim(); rec.purpose=val("fpur").trim();
+    rec.slip=val("fslip").trim(); rec.auth=val("fauth").trim(); rec.notes=val("fnotes").trim();
+    if (!isEdit) data.entries.push(rec);
+    save(); closeModal(); render();
+  };
+}
+
+/* ---------------- transfer form ---------------- */
+function transferForm(e){
+  var isEdit=!!e; e=e||{};
+  if (data.sites.length<2){ alert("Transfers need at least two sites. Add sites under More."); return; }
+  if (!data.items.length){ alert("Add an item first."); return; }
+  openModal('<h2>'+(isEdit?"Edit transfer":"Site transfer")+'</h2><form id="f">'
+    +'<div class="fg"><label>Date</label><input id="fdate" type="date" required value="'+esc(e.date||today())+'"></div>'
+    +'<div class="f2">'
+    +'<div class="fg"><label>From site</label><select id="ffrom" required>'+siteOptions(e.from||defaultSite())+'</select></div>'
+    +'<div class="fg"><label>To site</label><select id="fto2" required>'+siteOptions(e.to)+'</select></div>'
+    +'</div>'
+    +'<div class="fg"><label>Item</label><select id="fitem" required>'+itemOptions(e.item)+'</select>'
+    +'<div class="fhint" id="avail"></div></div>'
+    +'<div class="fg"><label>Quantity</label><input id="fqty" type="number" min="0.0001" step="any" required value="'+(e.qty||"")+'"></div>'
+    +'<div class="fg"><label>Notes</label><textarea id="fnotes" maxlength="300">'+esc(e.notes||"")+'</textarea></div>'
+    +'<div class="factions"><button type="button" class="btn ghost" id="fcancel">Cancel</button>'
+    +'<button class="btn acc" type="submit">'+(isEdit?"Save changes":"Save transfer")+'</button></div></form>');
+  document.getElementById("fcancel").onclick=closeModal;
+  function upd(){
+    var it=itemById(val("fitem")), st=stockOf(val("fitem"),val("ffrom"));
+    if (isEdit && e.item===val("fitem") && e.from===val("ffrom")) st += (+e.qty||0);
+    document.getElementById("avail").textContent="Available at source site: "+fmtQty(st)+" "+(it?it.unit||"":"");
+  }
+  ["fitem","ffrom"].forEach(function(id){ document.getElementById(id).onchange=upd; });
+  upd();
+  document.getElementById("f").onsubmit=function(ev){
+    ev.preventDefault();
+    if (val("ffrom")===val("fto2")){ alert("Choose two different sites."); return; }
+    var rec = isEdit ? e : {id:uid(),t:"T"};
+    rec.date=val("fdate"); rec.from=val("ffrom"); rec.to=val("fto2");
+    rec.item=val("fitem"); rec.qty=+val("fqty"); rec.notes=val("fnotes").trim();
+    if (!isEdit) data.entries.push(rec);
+    save(); closeModal(); render();
+  };
+}
+
+/* ---------------- ledger modal ---------------- */
+function ledgerModal(itemId){
+  var it=itemById(itemId); if (!it) return;
+  var rows=ledgerRows(itemId), r=avgRate(itemId), st=stockOf(itemId,S.site);
+  var scope = S.site==="all" ? "All sites" : siteName(S.site);
+  var h='<h2>'+esc(it.name)+' — ledger <span class="chip">'+esc(scope)+'</span></h2>'
+    +'<div class="rsub" style="margin-bottom:10px">Balance '+fmtQty(st)+' '+esc(it.unit||"")
+    +' · avg rate '+fmtMoney(r)+'/'+esc(it.unit||"unit")+' · value '+fmtMoney(st*r)
+    +(it.reorder>0?' · reorder at '+fmtQty(it.reorder):'')+'</div>';
+  if (!rows.length) h+='<div class="empty">No movement recorded'+(S.site!=="all"?" at this site":"")+'.</div>';
+  else {
+    h+='<div class="ledwrap"><table class="led"><tr><th>Date · particulars</th><th>In</th><th>Out</th><th>Balance</th></tr>';
+    rows.forEach(function(x){
+      var e=x.e, part;
+      if (e.t==="P") part=esc(e.supplier||"Purchase")+(e.inv?' <span class="sm">Inv '+esc(e.inv)+'</span>':'')+' <span class="sm">'+fmtMoney(e.rate)+'/'+esc(it.unit||"unit")+' · '+esc(siteName(e.site))+'</span>';
+      else if (e.t==="I") part='Issued'+(e.to?' to '+esc(e.to):'')+' <span class="sm">'+esc([e.purpose,e.slip?'Slip '+e.slip:''].filter(Boolean).join(" · "))+(e.purpose||e.slip?' · ':'')+esc(siteName(e.site))+'</span>';
+      else part='Transfer <span class="sm">'+esc(siteName(e.from))+' → '+esc(siteName(e.to))+'</span>';
+      h+='<tr><td class="part"><span class="sm" style="color:var(--ink)">'+fmtDate(e.date)+'</span>'+part+'</td>'
+        +'<td class="num" style="color:var(--green)">'+(x.delta>0?fmtQty(x.delta):"")+'</td>'
+        +'<td class="num" style="color:var(--red)">'+(x.delta<0?fmtQty(-x.delta):"")+'</td>'
+        +'<td class="num"><b>'+fmtQty(x.bal)+'</b></td></tr>';
+    });
+    h+='</table></div>';
+  }
+  h+='<div class="factions"><button class="btn ghost" id="bledcsv">Ledger CSV</button>'
+    +'<button class="btn" id="fcancel">Close</button></div>';
+  openModal(h);
+  document.getElementById("fcancel").onclick=closeModal;
+  document.getElementById("bledcsv").onclick=function(){ exportLedger(itemId); };
+}
+
+/* ---------------- CSV / backup ---------------- */
+function csvCell(v){
+  v = v==null ? "" : String(v);
+  return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+}
+function downloadFile(name, text, mime){
+  var b=new Blob([text],{type:mime||"text/csv;charset=utf-8"});
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(b); a.download=name;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },400);
+}
+function inRange(e, from, to){
+  if (from && (e.date||"") < from) return false;
+  if (to && (e.date||"") > to) return false;
+  return true;
+}
+function scopeTag(){ return S.site==="all" ? "all-sites" : siteName(S.site).replace(/[^\w-]+/g,"_"); }
+
+function exportReceipts(from,to){
+  var lines=[["Date","Site","Item","Unit","Qty","Rate","Amount","Supplier","Invoice No","PO No","Notes"].join(",")];
+  sortedEntries().forEach(function(e){
+    if (e.t!=="P" || !inScope(e) || !inRange(e,from,to)) return;
+    var it=itemById(e.item);
+    lines.push([e.date,siteName(e.site),itemName(e.item),it?it.unit||"":"",e.qty,e.rate,e.amount,e.supplier||"",e.inv||"",e.po||"",e.notes||""].map(csvCell).join(","));
+  });
+  downloadFile("receipts-"+scopeTag()+".csv", lines.join("\n"));
+}
+function exportIssues(from,to){
+  var lines=[["Date","Site","Item","Unit","Qty","Issued To","Purpose","Slip No","Authorised By","Notes"].join(",")];
+  sortedEntries().forEach(function(e){
+    if (e.t!=="I" || !inScope(e) || !inRange(e,from,to)) return;
+    var it=itemById(e.item);
+    lines.push([e.date,siteName(e.site),itemName(e.item),it?it.unit||"":"",e.qty,e.to||"",e.purpose||"",e.slip||"",e.auth||"",e.notes||""].map(csvCell).join(","));
+  });
+  downloadFile("issues-"+scopeTag()+".csv", lines.join("\n"));
+}
+function exportStock(){
+  var lines=[["Item","Unit","Category","Location","Stock","Avg Rate","Value","Reorder Level","Status"].join(",")];
+  data.items.slice().sort(function(a,b){return a.name.toLowerCase()<b.name.toLowerCase()?-1:1;})
+    .forEach(function(it){
+      var st=stockOf(it.id,S.site), r=avgRate(it.id);
+      var status = it.reorder>0 && st<=it.reorder ? "LOW" : "";
+      lines.push([it.name,it.unit||"",it.cat||"",it.loc||"",st,r?r.toFixed(2):"",(st*r).toFixed(2),it.reorder||"",status].map(csvCell).join(","));
+    });
+  downloadFile("stock-"+scopeTag()+".csv", lines.join("\n"));
+}
+function exportLedger(itemId){
+  var it=itemById(itemId);
+  var lines=[["Date","Type","Particulars","Site","In","Out","Balance"].join(",")];
+  ledgerRows(itemId).forEach(function(x){
+    var e=x.e, type = e.t==="P"?"Receipt":e.t==="I"?"Issue":"Transfer";
+    var part = e.t==="P" ? [e.supplier,e.inv?"Inv "+e.inv:""].filter(Boolean).join(" ")
+             : e.t==="I" ? [e.to?"To "+e.to:"",e.purpose].filter(Boolean).join(" — ")
+             : siteName(e.from)+" to "+siteName(e.to);
+    var siteCol = e.t==="T" ? siteName(e.from)+" → "+siteName(e.to) : siteName(e.site);
+    lines.push([e.date,type,part,siteCol,x.delta>0?x.delta:"",x.delta<0?-x.delta:"",x.bal].map(csvCell).join(","));
+  });
+  downloadFile("ledger-"+(it?it.name.replace(/[^\w-]+/g,"_"):"item")+"-"+scopeTag()+".csv", lines.join("\n"));
+}
+function backup(){
+  var out={app:"STORE-REGISTER",version:VERSION,exported:new Date().toISOString(),data:data};
+  downloadFile("store-register-backup-"+today()+".json", JSON.stringify(out,null,1), "application/json");
+}
+function restore(file){
+  var r=new FileReader();
+  r.onload=function(){
+    try {
+      var d=JSON.parse(r.result);
+      var payload = d && d.data && Array.isArray(d.data.sites) ? d.data
+                  : (d && Array.isArray(d.sites) ? d : null);
+      if (!payload || !Array.isArray(payload.items) || !Array.isArray(payload.entries)){
+        alert("That file is not a STORE-REGISTER backup."); return;
+      }
+      if (!confirm("Replace everything on this device with the backup? ("
+        +payload.sites.length+" sites, "+payload.items.length+" items, "+payload.entries.length+" entries)")) return;
+      data=payload; S.site="all"; save(); render();
+    } catch(e){ alert("Could not read that file."); }
+  };
+  r.readAsText(file);
+}
+
+/* ---------------- boot ---------------- */
+render();
+if ("serviceWorker" in navigator && location.protocol !== "file:"){
+  try { navigator.serviceWorker.register("sw.js").catch(function(){}); } catch(e){}
+}
+</script>
+</body>
+</html>
