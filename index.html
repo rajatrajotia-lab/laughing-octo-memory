@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.3.28" />
+<meta name="app-version" content="1.3.29" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -440,7 +440,7 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const APP_VERSION = "1.3.28";
+const APP_VERSION = "1.3.29";
 const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
 const cmpVer = (a, b) => {
   const x = String(a || "").split(".").map(Number);
@@ -518,7 +518,8 @@ const emptyData = () => ({
   rateP: 105,
   sites: [],
   logs: {},
-  stock: {}
+  stock: {},
+  maint: {}
 });
 function buildStock(list, machines, fuel) {
   const f = fuel || "HSD";
@@ -681,6 +682,67 @@ function buildAlerts(data) {
   const push = a => out.push(a);
   const now = new Date(today());
   data.sites.forEach(s => {
+    s.machines.forEach(m => {
+      if (m.category === "Subcontractor" || ownerOf(m) !== "Own") return;
+      const tag = m.name + (m.code ? " \u00b7 " + m.code : "");
+      [["Insurance", m.insExp], ["Road tax", m.taxUpto], ["Fitness certificate", m.fitExp], ["PUC", m.pucExp]].forEach(([label, dt]) => {
+        if (!dt) return;
+        const days = Math.round((new Date(dt) - now) / 86400000);
+        if (days < 0) push({
+          level: "critical",
+          kind: "doc",
+          site: s,
+          machine: m,
+          date: dt,
+          title: label + " expired",
+          detail: `${tag} \u2014 ${label.toLowerCase()} ran out on ${dt}`
+        });else if (days <= 30) push({
+          level: "warn",
+          kind: "doc",
+          site: s,
+          machine: m,
+          date: dt,
+          title: label + " expiring soon",
+          detail: `${tag} \u2014 valid till ${dt}, ${days} day(s) left`
+        });
+      });
+      const recs = ((data.maint || {})[m.id] || []).slice().sort((a, b) => a.date < b.date ? 1 : -1);
+      const last = recs[0];
+      if (last) {
+        if (last.nextDate) {
+          const days = Math.round((new Date(last.nextDate) - now) / 86400000);
+          if (days < 0) push({
+            level: "critical",
+            kind: "service",
+            site: s,
+            machine: m,
+            date: last.nextDate,
+            title: "Service overdue",
+            detail: `${tag} \u2014 service was due on ${last.nextDate}`
+          });else if (days <= 7) push({
+            level: "warn",
+            kind: "service",
+            site: s,
+            machine: m,
+            date: last.nextDate,
+            title: "Service due soon",
+            detail: `${tag} \u2014 service due on ${last.nextDate}`
+          });
+        }
+        if (num(last.nextMeter) > 0 && m.meterType !== "clock") {
+          const cur = (data.logs[m.id] || []).reduce((a, e) => Math.max(a, num(e.close) || 0), 0);
+          if (cur >= num(last.nextMeter)) push({
+            level: "critical",
+            kind: "service",
+            site: s,
+            machine: m,
+            date: today(),
+            title: "Service due by meter",
+            detail: `${tag} \u2014 crossed ${fmt(num(last.nextMeter), 0)} ${m.meterType === "km" ? "km" : "hrs"}, now at ${fmt(cur, 0)}`
+          });
+        }
+      }
+    });
     const fleet = siteFleet(data, s);
     FUELS.forEach(f => {
       const rows = buildStock(data.stock[s.id] || [], fleet, f);
@@ -931,6 +993,7 @@ function importKSDP(d) {
   d.logs = {};
   d.stock = {};
   d.locks = {};
+  d.maint = {};
   (src.sites || []).forEach(s => {
     d.sites.push({
       ...s,
@@ -961,10 +1024,14 @@ function exportBundle(data, siteId) {
   const sites = data.sites.filter(s => siteId === "all" || s.id === siteId).map(deep);
   const logs = {},
     stock = {},
-    locks = {};
+    locks = {},
+    maint = {};
   sites.forEach(s => {
     stock[s.id] = deep(data.stock[s.id] || []);
-    s.machines.forEach(m => logs[m.id] = deep(data.logs[m.id] || []));
+    s.machines.forEach(m => {
+      logs[m.id] = deep(data.logs[m.id] || []);
+      if (((data.maint || {})[m.id] || []).length) maint[m.id] = deep(data.maint[m.id]);
+    });
     Object.keys(data.locks || {}).forEach(k => {
       if (k.startsWith(s.id + ":")) locks[k] = deep(data.locks[k]);
     });
@@ -977,7 +1044,8 @@ function exportBundle(data, siteId) {
     sites,
     logs,
     stock,
-    locks
+    locks,
+    maint
   };
 }
 function mergeBundle(d, bundle, mode) {
@@ -987,6 +1055,7 @@ function mergeBundle(d, bundle, mode) {
     d.logs = {};
     d.stock = {};
     d.locks = {};
+    d.maint = {};
   }
   const report = {
     sites: 0,
@@ -1000,6 +1069,7 @@ function mergeBundle(d, bundle, mode) {
   d.logs = d.logs || {};
   d.stock = d.stock || {};
   d.locks = d.locks || {};
+  d.maint = d.maint || {};
   const siteMap = {};
   const machineMap = {};
   const allLocalMachineIds = () => new Set(d.sites.flatMap(s => s.machines.map(m => m.id)));
@@ -1049,6 +1119,16 @@ function mergeBundle(d, bundle, mode) {
           report.entries += 1;
         }
       });
+      const incM = (bundle.maint || {})[bm.id] || [];
+      if (incM.length) {
+        const ml = d.maint[localId] || (d.maint[localId] = []);
+        incM.forEach(br => {
+          const k = ml.findIndex(x => x.id === br.id);
+          if (k >= 0) {
+            if (mode === "replace" || mode === "replaceAll") ml[k] = deep(br);
+          } else ml.push(deep(br));
+        });
+      }
     });
     const localSiteId = siteMap[bs.id];
     const incomingStock = (bundle.stock || {})[bs.id] || [];
@@ -1126,6 +1206,7 @@ function DieselLogbook() {
         delete e.supplier;
       }));
       if (!start.logs) start.logs = {};
+      if (!start.maint) start.maint = {};
       if (start.rateP === undefined) start.rateP = 105;
       start = importKSDP(start);
       const focus = start.focusSite;
@@ -1512,6 +1593,8 @@ function DieselLogbook() {
       Petrol: make("Petrol")
     };
   }, [data]);
+  const [maintView, setMaintView] = useState(false);
+  useEffect(() => setMaintView(false), [siteId, machineId]);
   const update = fn => setData(d => {
     const copy = JSON.parse(JSON.stringify(d));
     fn(copy);
@@ -1540,6 +1623,20 @@ function DieselLogbook() {
     setMachineId(id);
     setForm(blankEntry());
   };
+  const saveMaint = rec => update(d => {
+    d.maint = d.maint || {};
+    const list = d.maint[machineId] || (d.maint[machineId] = []);
+    list.push({
+      ...rec,
+      id: uid()
+    });
+  });
+  const deleteMaint = rid => update(d => {
+    const list = (d.maint || {})[machineId];
+    if (!list) return;
+    const i = list.findIndex(x => x.id === rid);
+    if (i >= 0) list.splice(i, 1);
+  });
   const removeMachine = id => {
     update(d => {
       const s = d.sites.find(x => x.id === siteId);
@@ -1557,6 +1654,7 @@ function DieselLogbook() {
       });
       s.machines = s.machines.filter(m => m.id !== id);
       delete d.logs[id];
+      if (d.maint) delete d.maint[id];
     });
     setMachineId(null);
   };
@@ -2390,7 +2488,23 @@ function DieselLogbook() {
     month: month,
     onSave: saveStock,
     onDelete: deleteStock
-  }) : !machine ? null : React.createElement("section", {
+  }) : !machine ? null : maintView && ownerOf(machine) === "Own" ? React.createElement(MaintPanel, {
+    machine: machine,
+    site: site,
+    records: (data.maint || {})[machine.id] || [],
+    logs: data.logs[machine.id] || [],
+    month: month,
+    onSave: saveMaint,
+    onDelete: rid => setAsk({
+      title: "Delete maintenance record",
+      body: "Delete this maintenance record? This cannot be undone.",
+      label: "Delete record",
+      danger: true,
+      run: () => deleteMaint(rid)
+    }),
+    onEdit: () => setDialog("editMachine"),
+    onBack: () => setMaintView(false)
+  }) : React.createElement("section", {
     className: "dl-panel"
   }, React.createElement("div", {
     className: "dl-panelhead"
@@ -2416,7 +2530,10 @@ function DieselLogbook() {
     className: "dl-postings"
   }, postingsOf(machine).map(pg => `${pg.siteName}${pg.from ? ` from ${pg.from}` : ""}`).join("  →  "))), React.createElement("div", {
     className: "dl-rowbtns"
-  }, React.createElement("button", {
+  }, ownerOf(machine) === "Own" && React.createElement("button", {
+    className: "dl-btn ghost",
+    onClick: () => setMaintView(true)
+  }, "Maintenance"), React.createElement("button", {
     className: "dl-btn ghost",
     onClick: () => setDialog("move"),
     disabled: data.sites.length < 2
@@ -3007,6 +3124,7 @@ function Dashboard({
   const inHand = sites.reduce((a, b) => a + (b.st.closing || 0), 0);
   const cost = sites.reduce((a, b) => a + b.cost, 0);
   const entries = sites.reduce((a, b) => a + b.entries, 0);
+  const maintSpend = data.sites.flatMap(s => s.machines).reduce((a, m) => a + (((data.maint || {})[m.id]) || []).filter(r => month === "all" || (r.date || "").slice(0, 7) === month).reduce((x, y) => x + num(y.cost), 0), 0);
   const ownSplit = OWNERSHIP.map(o => {
     const rs = allRows.filter(r => r.own === o);
     return {
@@ -3162,6 +3280,12 @@ function Dashboard({
     unit: `litres of ${fmt(consumed, 0)} consumed`,
     alert: excess > 0,
     onClick: () => setDrill("over")
+  }), React.createElement(Kpi, {
+    label: "Papers & service",
+    value: alerts ? alerts.filter(a => a.kind === "doc" || a.kind === "service").length : 0,
+    unit: "expired or due soon \u00b7 own machines",
+    alert: !!(alerts && alerts.some(a => a.kind === "doc" || a.kind === "service")),
+    onClick: onAlerts
   })), tab === "overview" && React.createElement("p", {
     className: "dl-legend"
   }, "Every figure above opens its detail — click a card. ", entries, " entries in this period."), tab === "overview" && React.createElement("div", {
@@ -3458,6 +3582,10 @@ function Dashboard({
     value: "₹ " + fmt(plantTotal, 0),
     unit: "per month · click for site-wise detail",
     onClick: () => setDrill("rent")
+  }), React.createElement(Kpi, {
+    label: "Maintenance spend",
+    value: "₹ " + fmt(maintSpend, 0),
+    unit: (month === "all" ? "all months" : monthLabel(month)) + " \u00b7 from maintenance records"
   })), plantBySite.length > 0 && React.createElement("div", {
     className: "dl-chart",
     style: {
@@ -4809,6 +4937,181 @@ function SiteDialog({
     onClick: submit
   }, initial ? "Save changes" : "Create site")));
 }
+const MTYPES = ["Routine service", "Repair", "Breakdown"];
+function MaintPanel({
+  machine,
+  site,
+  records,
+  logs,
+  month,
+  onSave,
+  onDelete,
+  onEdit,
+  onBack
+}) {
+  const [f, setF] = useState({
+    date: today(),
+    meter: "",
+    type: MTYPES[0],
+    desc: "",
+    cost: "",
+    nextDate: "",
+    nextMeter: ""
+  });
+  const [err, setErr] = useState("");
+  const set = (k, v) => setF({
+    ...f,
+    [k]: v
+  });
+  const unit = machine.meterType === "km" ? "km" : "hrs";
+  const curMeter = (logs || []).reduce((a, e) => Math.max(a, num(e.close) || 0), 0);
+  const sorted = records.slice().sort((a, b) => a.date < b.date ? 1 : -1);
+  const inMonth = sorted.filter(r => month === "all" || (r.date || "").slice(0, 7) === month);
+  const totalCost = inMonth.reduce((a, b) => a + num(b.cost), 0);
+  const now = new Date(today());
+  const docState = dt => {
+    if (!dt) return { v: "\u2014", u: "not recorded", alert: false };
+    const days = Math.round((new Date(dt) - now) / 86400000);
+    if (days < 0) return { v: "Expired", u: "ran out " + dt, alert: true };
+    if (days <= 30) return { v: days + " day(s)", u: "valid till " + dt, alert: true };
+    return { v: "Valid", u: "till " + dt, alert: false };
+  };
+  const docs = [["Insurance" + (machine.insNo ? " \u00b7 " + machine.insNo : ""), machine.insExp], ["Road tax", machine.taxUpto], ["Fitness certificate", machine.fitExp], ["PUC", machine.pucExp]];
+  const submit = () => {
+    if (!f.date) return setErr("Give the record a date.");
+    if (!f.desc.trim()) return setErr("Describe what was done.");
+    onSave({
+      ...f,
+      desc: f.desc.trim()
+    });
+    setF({
+      date: today(),
+      meter: "",
+      type: MTYPES[0],
+      desc: "",
+      cost: "",
+      nextDate: "",
+      nextMeter: ""
+    });
+    setErr("");
+  };
+  return React.createElement("section", {
+    className: "dl-panel"
+  }, React.createElement("div", {
+    className: "dl-panelhead"
+  }, React.createElement("div", null, React.createElement("h2", null, machine.name, " \u2014 maintenance"), React.createElement("p", null, machine.code || "no reg no", " \u00b7 ", site.nick || site.name, " \u00b7 current reading ", fmt(curMeter, 0), " ", unit)), React.createElement("div", {
+    className: "dl-rowbtns"
+  }, React.createElement("button", {
+    className: "dl-btn ghost",
+    onClick: onBack
+  }, "\u2190 Fuel log"), React.createElement("button", {
+    className: "dl-btn ghost",
+    onClick: onEdit
+  }, "Edit documents"))), React.createElement("div", {
+    className: "dl-kpis"
+  }, docs.map(([label, dt]) => {
+    const st = docState(dt);
+    return React.createElement(Kpi, {
+      key: label,
+      label: label,
+      value: st.v,
+      unit: st.u,
+      alert: st.alert
+    });
+  })), React.createElement("div", {
+    className: "dl-block"
+  }, React.createElement("h3", {
+    className: "dl-blockhead"
+  }, "New maintenance record"), React.createElement("div", {
+    className: "dl-grid"
+  }, React.createElement(F, {
+    label: "Date",
+    accent: true
+  }, React.createElement("input", {
+    type: "date",
+    value: f.date,
+    onChange: e => set("date", e.target.value)
+  })), React.createElement(F, {
+    label: `Reading (${unit})`
+  }, React.createElement("input", {
+    type: "number",
+    value: f.meter,
+    onChange: e => set("meter", e.target.value),
+    placeholder: curMeter ? `now about ${fmt(curMeter, 0)}` : ""
+  })), React.createElement(F, {
+    label: "Type"
+  }, React.createElement("select", {
+    value: f.type,
+    onChange: e => set("type", e.target.value)
+  }, MTYPES.map(t => React.createElement("option", {
+    key: t
+  }, t)))), React.createElement(F, {
+    label: "Work done",
+    wide: true,
+    accent: true
+  }, React.createElement("input", {
+    value: f.desc,
+    onChange: e => set("desc", e.target.value),
+    placeholder: "e.g. engine oil + filters changed"
+  })), React.createElement(F, {
+    label: "Cost (\u20b9)"
+  }, React.createElement("input", {
+    type: "number",
+    value: f.cost,
+    onChange: e => set("cost", e.target.value)
+  })), React.createElement(F, {
+    label: "Next service due (date)"
+  }, React.createElement("input", {
+    type: "date",
+    value: f.nextDate,
+    onChange: e => set("nextDate", e.target.value)
+  })), React.createElement(F, {
+    label: `Next service due (${unit})`
+  }, React.createElement("input", {
+    type: "number",
+    value: f.nextMeter,
+    onChange: e => set("nextMeter", e.target.value),
+    placeholder: "reading at which service is due"
+  }))), err && React.createElement("p", {
+    className: "dl-xfererr"
+  }, err), React.createElement("div", {
+    className: "dl-formfoot"
+  }, React.createElement("button", {
+    className: "dl-btn",
+    onClick: submit
+  }, "Add record"))), React.createElement("div", {
+    className: "dl-block"
+  }, React.createElement("h3", {
+    className: "dl-blockhead"
+  }, "Maintenance history", month === "all" ? "" : " \u2014 all records"), sorted.length === 0 ? React.createElement("p", {
+    className: "dl-hint"
+  }, "No maintenance recorded yet for this machine.") : React.createElement("div", {
+    className: "dl-tablewrap"
+  }, React.createElement("table", {
+    className: "dl-table"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Date"), React.createElement("th", {
+    className: "r"
+  }, "Reading"), React.createElement("th", null, "Type"), React.createElement("th", null, "Work done"), React.createElement("th", {
+    className: "r"
+  }, "Cost \u20b9"), React.createElement("th", null, "Next due"), React.createElement("th", null, ""))), React.createElement("tbody", null, sorted.map(r => React.createElement("tr", {
+    key: r.id
+  }, React.createElement("td", {
+    className: "mono"
+  }, r.date), React.createElement("td", {
+    className: "r mono"
+  }, num(r.meter) ? fmt(num(r.meter), 0) : "\u2014"), React.createElement("td", {
+    className: "dl-sub2"
+  }, r.type), React.createElement("td", null, r.desc), React.createElement("td", {
+    className: "r mono"
+  }, num(r.cost) ? fmt(num(r.cost), 0) : "\u2014"), React.createElement("td", {
+    className: "mono dl-sub2"
+  }, [r.nextDate, num(r.nextMeter) ? fmt(num(r.nextMeter), 0) + " " + unit : ""].filter(Boolean).join(" / ") || "\u2014"), React.createElement("td", null, React.createElement("button", {
+    className: "dl-link",
+    onClick: () => onDelete(r.id)
+  }, "delete"))))))), React.createElement("p", {
+    className: "dl-legend"
+  }, "Total maintenance cost ", month === "all" ? "recorded" : "in " + monthLabel(month), ": \u20b9 ", fmt(totalCost, 0), ". Expiry and service-due warnings from this page appear in the Alerts button at the top of the app.")));
+}
 function MachineDialog({
   onClose,
   onSave,
@@ -4925,7 +5228,37 @@ function MachineDialog({
     value: m.ownCost || "",
     onChange: e => set("ownCost", e.target.value),
     placeholder: "EMI, depreciation, upkeep"
+  })), !isSub && m.ownership === "Own" && React.createElement(React.Fragment, null, React.createElement(F, {
+    label: "Insurance policy no."
+  }, React.createElement("input", {
+    value: m.insNo || "",
+    onChange: e => set("insNo", e.target.value),
+    placeholder: "policy number"
   })), React.createElement(F, {
+    label: "Insurance valid till"
+  }, React.createElement("input", {
+    type: "date",
+    value: m.insExp || "",
+    onChange: e => set("insExp", e.target.value)
+  })), React.createElement(F, {
+    label: "Road tax paid up to"
+  }, React.createElement("input", {
+    type: "date",
+    value: m.taxUpto || "",
+    onChange: e => set("taxUpto", e.target.value)
+  })), React.createElement(F, {
+    label: "Fitness valid till"
+  }, React.createElement("input", {
+    type: "date",
+    value: m.fitExp || "",
+    onChange: e => set("fitExp", e.target.value)
+  })), React.createElement(F, {
+    label: "PUC valid till"
+  }, React.createElement("input", {
+    type: "date",
+    value: m.pucExp || "",
+    onChange: e => set("pucExp", e.target.value)
+  }))), React.createElement(F, {
     label: "Fuel"
   }, React.createElement("select", {
     value: m.fuel,
