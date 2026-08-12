@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.3.41" />
+<meta name="app-version" content="1.3.42" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -441,7 +441,7 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const APP_VERSION = "1.3.41";
+const APP_VERSION = "1.3.42";
 const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
 const cmpVer = (a, b) => {
   const x = String(a || "").split(".").map(Number);
@@ -2665,6 +2665,7 @@ function DieselLogbook() {
     data: data,
     onSave: saveDaySheet,
     onOpenMachine: id => setMachineId(id),
+    onAddMachine: () => setDialog("machine"),
     isLockedFn: dt => isLocked(data, site.id, dt)
   }) : machineId === null ? React.createElement("section", {
     className: "dl-panel"
@@ -5286,6 +5287,7 @@ function DaySheet({
   data,
   onSave,
   onOpenMachine,
+  onAddMachine,
   isLockedFn
 }) {
   const [date, setDate] = useState(today());
@@ -5572,7 +5574,10 @@ function DaySheet({
     key: f,
     className: fuel === f ? "on" : "",
     onClick: () => setFuel(f)
-  }, f))))), locked && React.createElement("p", {
+  }, f))), React.createElement("button", {
+    className: "dl-btn ghost",
+    onClick: onAddMachine
+  }, "+ Fuel user"))), locked && React.createElement("p", {
     className: "dl-xfererr"
   }, monthLabel(date.slice(0, 7)), " is locked for this site \u2014 entries cannot be added."), help, kpis, React.createElement("label", {
     className: "dl-check"
@@ -5582,7 +5587,7 @@ function DaySheet({
     onChange: e => setOnlyYest(e.target.checked)
   }), "Show only machines that drew fuel yesterday"), flt.length === 0 ? React.createElement("p", {
     className: "dl-hint"
-  }, "No ", fuel, " machines on this site yet \u2014 add fuel users first.") : React.createElement("div", {
+  }, "No ", fuel, " machines on this site yet \u2014 press + Fuel user to add the first one.") : React.createElement("div", {
     className: "dl-tablewrap"
   }, React.createElement("table", {
     className: "dl-table"
