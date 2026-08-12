@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.3.40" />
+<meta name="app-version" content="1.3.41" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -426,6 +426,7 @@ const {
 } = Recharts;
 const STORE_KEY = "diesel:register:v1";
 const STOCK = "__stock__";
+const SHEET = "__sheet__";
 const uid = () => Math.random().toString(36).slice(2, 10);
 const today = () => {
   const d = new Date();
@@ -440,7 +441,7 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const APP_VERSION = "1.3.40";
+const APP_VERSION = "1.3.41";
 const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
 const cmpVer = (a, b) => {
   const x = String(a || "").split(".").map(Number);
@@ -1376,7 +1377,7 @@ function DieselLogbook() {
         } catch (e) {}
         if (ui && typeof ui === "object") {
           if (ui.siteId && start.sites.find(s => s.id === ui.siteId)) setSiteId(ui.siteId);
-          if (ui.machineId === STOCK || ui.machineId && start.sites.some(s => s.machines.some(m => m.id === ui.machineId))) setMachineId(ui.machineId);
+          if (ui.machineId === STOCK || ui.machineId === SHEET || ui.machineId && start.sites.some(s => s.machines.some(m => m.id === ui.machineId))) setMachineId(ui.machineId);
           if (["dash", "site", "buy", "norms", "reports"].includes(ui.view)) setView(ui.view);
           if (ui.month === "all" || /^\d{4}-\d{2}$/.test(ui.month || "")) setMonth(ui.month);
         }
@@ -1897,6 +1898,81 @@ function DieselLogbook() {
     if (total > 0) day.issues[m.id] = +total.toFixed(2);else delete day.issues[m.id];
     const empty = (day.receipts || []).length === 0 && Object.values(day.issues).every(q => !num(q)) && !num(day.otherQty) && (day.physical === "" || day.physical === null || day.physical === undefined) && !(day.remarks || "").trim() && String(day.opening || "").trim() === "";
     if (empty) d.stock[siteId] = list.filter(x => x.id !== day.id);
+  };
+  const saveDaySheet = payload => {
+    const {
+      date,
+      fuel: f,
+      rows,
+      otherQty,
+      otherLabel,
+      physical,
+      remarks,
+      opening
+    } = payload;
+    if (!site) return false;
+    if (isLocked(data, site.id, date)) {
+      setNote(`${monthLabel(date.slice(0, 7))} is locked for this site.`);
+      return false;
+    }
+    const applyTo = d => {
+      const s = d.sites.find(x => x.id === site.id);
+      rows.forEach(r => {
+        const e = {
+          id: uid(),
+          date,
+          shift: "Full",
+          source: "Site tank",
+          condition: "Working",
+          downHours: "",
+          downReason: "",
+          slip: "",
+          open: String(r.open === undefined || r.open === null ? "" : r.open),
+          close: String(r.close === undefined || r.close === null ? "" : r.close),
+          litres: String(r.litres),
+          operator: r.operator || "",
+          work: "",
+          remarks: "",
+          siteId: site.id
+        };
+        (d.logs[r.mId] = d.logs[r.mId] || []).push(e);
+      });
+      rows.forEach(r => {
+        const m = siteFleet(d, d.sites.find(x => x.id === site.id) || site).find(x => x.id === r.mId) || fleet.find(x => x.id === r.mId);
+        if (m) syncStockIssue(d, site.id, m, date);
+      });
+      const list = d.stock[site.id] = d.stock[site.id] || [];
+      let day = list.find(x => x.date === date && (x.fuel || "HSD") === f);
+      if (!day && (num(otherQty) > 0 || physical !== "" && physical !== undefined || (remarks || "").trim() || opening !== undefined && String(opening) !== "")) {
+        day = {
+          ...blankStock(f),
+          id: uid(),
+          date,
+          fuel: f,
+          opening: ""
+        };
+        list.push(day);
+      }
+      if (day) {
+        if (opening !== undefined && String(opening) !== "") day.opening = String(opening);
+        if (num(otherQty) > 0) {
+          day.otherQty = String(num(day.otherQty) + num(otherQty));
+          if (otherLabel) day.otherLabel = day.otherLabel ? `${day.otherLabel}, ${otherLabel}` : otherLabel;
+        }
+        if (physical !== "" && physical !== undefined) day.physical = String(physical);
+        if ((remarks || "").trim()) day.remarks = day.remarks ? day.remarks + " \u00b7 " + remarks : remarks;
+      }
+    };
+    const trial = JSON.parse(JSON.stringify(data));
+    applyTo(trial);
+    const short = chainShort(trial.stock[site.id] || [], site, f);
+    if (short) {
+      setNote(`That would overdraw the tank on ${short.e.date} — the register would show ${fmt(short.closing, 1)} L. Reduce the litres.`);
+      return false;
+    }
+    update(applyTo);
+    setNote("Day sheet saved — logbook entries and the fuel register written together.");
+    return true;
   };
   const saveEntry = () => {
     if (!machine) return;
@@ -2460,7 +2536,7 @@ function DieselLogbook() {
     value: siteId || "",
     onChange: e => {
       setSiteId(e.target.value);
-      setMachineId(null);
+      setMachineId(SHEET);
       setEditId(null);
       setForm(blankEntry());
     }
@@ -2555,6 +2631,9 @@ function DieselLogbook() {
   }, React.createElement("div", {
     className: "dl-switch"
   }, React.createElement("button", {
+    className: machineId === SHEET ? "on" : "",
+    onClick: () => setMachineId(SHEET)
+  }, "Today's sheet"), React.createElement("button", {
     className: machineId === null ? "on" : "",
     onClick: () => setMachineId(null)
   }, "Site summary"), React.createElement("button", {
@@ -2580,7 +2659,14 @@ function DieselLogbook() {
   }, React.createElement("button", {
     className: "dl-btn ghost",
     onClick: () => setDialog("machine")
-  }, "+ Fuel user"))), machineId === null ? React.createElement("section", {
+  }, "+ Fuel user"))), machineId === SHEET ? React.createElement(DaySheet, {
+    site: site,
+    machines: fleet,
+    data: data,
+    onSave: saveDaySheet,
+    onOpenMachine: id => setMachineId(id),
+    isLockedFn: dt => isLocked(data, site.id, dt)
+  }) : machineId === null ? React.createElement("section", {
     className: "dl-panel"
   }, React.createElement("div", {
     className: "dl-panelhead"
@@ -5194,6 +5280,337 @@ function SiteDialog({
     onClick: submit
   }, initial ? "Save changes" : "Create site")));
 }
+function DaySheet({
+  site,
+  machines,
+  data,
+  onSave,
+  onOpenMachine,
+  isLockedFn
+}) {
+  const [date, setDate] = useState(today());
+  const [fuel, setFuel] = useState("HSD");
+  const [draft, setDraft] = useState({});
+  const [other, setOther] = useState({
+    qty: "",
+    label: ""
+  });
+  const [dip, setDip] = useState("");
+  const [rem, setRem] = useState("");
+  const [onlyYest, setOnlyYest] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [openingFirst, setOpeningFirst] = useState("");
+  useEffect(() => {
+    setDraft({});
+    setMsg("");
+    setOther({
+      qty: "",
+      label: ""
+    });
+    setDip("");
+    setRem("");
+  }, [date, fuel, site && site.id]);
+  const flt = machines.filter(m => fuelOf(m) === fuel);
+  const logsOf = m => data.logs[m.id] || [];
+  const prevCloseOf = m => {
+    let best = null;
+    logsOf(m).forEach(e => {
+      if ((e.date || "") < date && e.close !== "" && e.close !== null && e.close !== undefined && !isClock(m)) {
+        const c = num(e.close);
+        if (best === null || c > best) best = c;
+      }
+    });
+    return best;
+  };
+  const lastOperator = m => {
+    const es = logsOf(m).filter(e => e.operator).sort((a, b) => a.date < b.date ? 1 : -1);
+    return es[0] ? es[0].operator : "";
+  };
+  const doneOf = m => logsOf(m).filter(e => e.date === date && !isDirect(e));
+  const yest = (() => {
+    const p = date.split("-").map(Number);
+    if (p.length !== 3 || p.some(isNaN)) return "";
+    const t = new Date(p[0], p[1] - 1, p[2] - 1);
+    const z = n => String(n).padStart(2, "0");
+    return `${t.getFullYear()}-${z(t.getMonth() + 1)}-${z(t.getDate())}`;
+  })();
+  const drewYest = m => logsOf(m).some(e => e.date === yest && num(e.litres) > 0);
+  const shown = onlyYest ? flt.filter(m => drewYest(m) || doneOf(m).length) : flt;
+  const stockRows = buildStock(data.stock[site.id] || [], machines, fuel);
+  const dayRow = stockRows.find(r => r.e.date === date);
+  const before = stockRows.filter(r => r.e.date < date);
+  const opening = dayRow ? dayRow.opening : before.length ? before[0].closing : null;
+  const received = dayRow ? dayRow.received : 0;
+  const issuedAlready = dayRow ? dayRow.issued : 0;
+  const firstEver = stockRows.length === 0;
+  const draftTotal = flt.reduce((a, m) => a + (doneOf(m).length ? 0 : num((draft[m.id] || {}).litres)), 0) + num(other.qty);
+  const base = dayRow ? dayRow.closing : opening !== null && opening !== undefined ? opening : firstEver ? num(openingFirst) : 0;
+  const remaining = base - draftTotal;
+  const locked = isLockedFn(date);
+  const set = (mId, k, v) => setDraft({
+    ...draft,
+    [mId]: {
+      ...(draft[mId] || {}),
+      [k]: v
+    }
+  });
+  const rateOf = (m, run, litres) => {
+    if (!(run > 0) || !(litres > 0)) return null;
+    return m.meterType !== "km" ? litres / run : run / litres;
+  };
+  const rateBad = (m, eff) => {
+    const n = num(m.siteNorms && m.siteNorms[site.id] || m.norm);
+    if (!n || eff === null) return false;
+    return m.meterType !== "km" ? eff > n * 1.05 : eff < n * 0.95;
+  };
+  const submit = () => {
+    const rows = [];
+    for (const m of flt) {
+      if (doneOf(m).length) continue;
+      const d0 = draft[m.id];
+      if (!d0) continue;
+      const any = String(d0.litres || "") || String(d0.close || "") || String(d0.start || "") || String(d0.stop || "") || String(d0.open || "");
+      if (!any) continue;
+      const litres = num(d0.litres);
+      if (!(litres > 0)) return setMsg(`${m.name}: enter the litres issued.`);
+      if (isClock(m)) {
+        if (!d0.start || !d0.stop) return setMsg(`${m.name}: enter start and stop time.`);
+        rows.push({
+          mId: m.id,
+          open: d0.start,
+          close: d0.stop,
+          litres,
+          operator: d0.operator !== undefined ? d0.operator : lastOperator(m)
+        });
+      } else {
+        const pc = prevCloseOf(m);
+        if (d0.close === "" || d0.close === undefined) return setMsg(`${m.name}: enter today's closing reading.`);
+        if (pc === null && (d0.open === "" || d0.open === undefined)) return setMsg(`${m.name}: first entry for this machine — enter its opening reading too.`);
+        const open = pc !== null ? pc : num(d0.open);
+        const close = num(d0.close);
+        if (close < open) return setMsg(`${m.name}: closing reading ${fmt(close, 1)} is below the opening ${fmt(open, 1)}.`);
+        const run = close - open;
+        if (m.meterType === "hours" && run > 24) return setMsg(`${m.name}: ${fmt(run, 1)} hours in one day is not possible — check the reading.`);
+        rows.push({
+          mId: m.id,
+          open,
+          close,
+          litres,
+          operator: d0.operator !== undefined ? d0.operator : lastOperator(m)
+        });
+      }
+    }
+    if (!rows.length && !(num(other.qty) > 0) && dip === "" && !rem.trim()) return setMsg("Nothing filled in yet — enter at least one machine's diesel.");
+    if (firstEver && String(openingFirst) === "") return setMsg("First day at this site — enter the opening stock above.");
+    if (remaining < -0.001) return setMsg("The tank does not hold that much — see Remaining. Reduce the litres or record the purchase first.");
+    const ok = onSave({
+      date,
+      fuel,
+      rows,
+      otherQty: other.qty,
+      otherLabel: other.label,
+      physical: dip,
+      remarks: rem.trim(),
+      opening: firstEver ? openingFirst : undefined
+    });
+    if (ok) {
+      setDraft({});
+      setOther({
+        qty: "",
+        label: ""
+      });
+      setDip("");
+      setRem("");
+      setMsg("");
+    }
+  };
+  const numIn = (val, on, ph, wide) => React.createElement("input", {
+    type: "number",
+    inputMode: "decimal",
+    className: "dl-sheetnum" + (wide ? " wide" : ""),
+    value: val === undefined ? "" : val,
+    onChange: e => on(e.target.value),
+    placeholder: ph || "",
+    disabled: locked
+  });
+  const rowsEls = shown.map(m => {
+    const done = doneOf(m);
+    if (done.length) {
+      const litres = done.reduce((a, e) => a + num(e.litres), 0);
+      return React.createElement("tr", {
+        key: m.id,
+        className: "dl-sheetdone"
+      }, React.createElement("td", null, React.createElement("strong", null, m.name), React.createElement("span", {
+        className: "dl-sub"
+      }, m.code || "")), React.createElement("td", {
+        colSpan: 4,
+        className: "dl-sub2"
+      }, "\u2713 entered \u2014 ", fmt(litres, 1), " L in ", done.length, " entr", done.length === 1 ? "y" : "ies"), React.createElement("td", {
+        colSpan: 2
+      }, React.createElement("button", {
+        className: "dl-link",
+        onClick: () => onOpenMachine(m.id)
+      }, "add more / edit \u2192")));
+    }
+    const d0 = draft[m.id] || {};
+    const pc = prevCloseOf(m);
+    const run = isClock(m) ? (() => {
+      const a = parseClock(d0.start),
+        b = parseClock(d0.stop);
+      if (a === null || b === null) return 0;
+      let r = b - a;
+      if (r < 0) r += 24;
+      return r;
+    })() : d0.close !== undefined && d0.close !== "" ? num(d0.close) - (pc !== null ? pc : num(d0.open)) : 0;
+    const eff = rateOf(m, run, num(d0.litres));
+    const unit = m.meterType !== "km" ? "L/hr" : "km/L";
+    return React.createElement("tr", {
+      key: m.id
+    }, React.createElement("td", null, React.createElement("strong", null, m.name), React.createElement("span", {
+      className: "dl-sub"
+    }, m.code || m.category)), React.createElement("td", {
+      className: "r mono"
+    }, isClock(m) ? "clock" : pc !== null ? fmt(pc, 1) : numIn(d0.open, v => set(m.id, "open", v), "opening")), React.createElement("td", {
+      className: "r"
+    }, isClock(m) ? React.createElement("span", {
+      className: "dl-times"
+    }, React.createElement("input", {
+      type: "time",
+      value: d0.start || "",
+      onChange: e => set(m.id, "start", e.target.value),
+      disabled: locked
+    }), React.createElement("input", {
+      type: "time",
+      value: d0.stop || "",
+      onChange: e => set(m.id, "stop", e.target.value),
+      disabled: locked
+    })) : numIn(d0.close, v => set(m.id, "close", v), "closing")), React.createElement("td", {
+      className: "r"
+    }, numIn(d0.litres, v => set(m.id, "litres", v), "litres")), React.createElement("td", {
+      className: "r mono"
+    }, run > 0 ? fmt(run, 1) : "\u2014"), React.createElement("td", {
+      className: "r mono" + (rateBad(m, eff) ? " flag over" : "")
+    }, eff === null ? "\u2014" : fmt(eff, 2) + " " + unit), React.createElement("td", null, React.createElement("input", {
+      className: "dl-sheetop",
+      value: d0.operator !== undefined ? d0.operator : lastOperator(m),
+      onChange: e => set(m.id, "operator", e.target.value),
+      placeholder: "operator",
+      disabled: locked
+    })));
+  });
+  const kpis = React.createElement("div", {
+    className: "dl-kpis"
+  }, React.createElement(Kpi, {
+    label: "Opening stock",
+    value: firstEver ? "\u2014" : opening === null || opening === undefined ? "\u2014" : fmt(opening, 1),
+    unit: firstEver ? "first day \u2014 enter below" : "litres"
+  }), React.createElement(Kpi, {
+    label: "Received",
+    value: fmt(received, 1),
+    unit: "litres \u00b7 from Purchases"
+  }), React.createElement(Kpi, {
+    label: "Issued so far",
+    value: fmt(issuedAlready, 1),
+    unit: "litres already on the register"
+  }), React.createElement(Kpi, {
+    label: "Remaining",
+    value: fmt(remaining, 1),
+    unit: draftTotal > 0 ? `after the ${fmt(draftTotal, 1)} L on this sheet` : "litres in the tank",
+    alert: remaining < -0.001
+  }));
+  const help = React.createElement("details", {
+    className: "dl-help"
+  }, React.createElement("summary", null, "How to enter a day \u2014 3 steps"), React.createElement("ol", null, React.createElement("li", null, "For every machine that drew diesel today, type the closing reading and the litres. The opening reading and operator come up on their own."), React.createElement("li", null, "Watch the Remaining card \u2014 it falls as you type. It must never go below zero."), React.createElement("li", null, "Enter the evening dip if measured, press Save sheet \u2014 the logbook and the fuel register are both written together. Then press the disk icon at the top right to store everything.")));
+  const foot = React.createElement("div", {
+    className: "dl-grid",
+    style: {
+      marginTop: 14
+    }
+  }, firstEver && React.createElement(F, {
+    label: "Opening stock (first day, litres)",
+    accent: true
+  }, numIn(openingFirst, setOpeningFirst, "e.g. 500")), React.createElement(F, {
+    label: "Other issue (L) \u2014 optional"
+  }, numIn(other.qty, v => setOther({
+    ...other,
+    qty: v
+  }), "e.g. pump set")), React.createElement(F, {
+    label: "Other issue \u2014 for what"
+  }, React.createElement("input", {
+    value: other.label,
+    onChange: e => setOther({
+      ...other,
+      label: e.target.value
+    }),
+    placeholder: "who / what took it",
+    disabled: locked
+  })), React.createElement(F, {
+    label: "Physical dip (L) \u2014 optional"
+  }, numIn(dip, setDip, "measured stock")), React.createElement(F, {
+    label: "Remarks \u2014 optional",
+    wide: true
+  }, React.createElement("input", {
+    value: rem,
+    onChange: e => setRem(e.target.value),
+    disabled: locked
+  })));
+  return React.createElement("section", {
+    className: "dl-panel dl-sheet"
+  }, React.createElement("div", {
+    className: "dl-panelhead"
+  }, React.createElement("div", null, React.createElement("h2", null, "Today's sheet \u2014 ", site.nick || site.name), React.createElement("p", null, "One line per machine \u2014 closing reading and litres. Everything else fills itself.")), React.createElement("div", {
+    className: "dl-rowbtns"
+  }, React.createElement("label", {
+    className: "dl-field dl-inline"
+  }, React.createElement("span", null, "Date"), React.createElement("input", {
+    type: "date",
+    value: date,
+    onChange: e => setDate(e.target.value)
+  })), React.createElement("div", {
+    className: "dl-switch"
+  }, FUELS.map(f => React.createElement("button", {
+    key: f,
+    className: fuel === f ? "on" : "",
+    onClick: () => setFuel(f)
+  }, f))))), locked && React.createElement("p", {
+    className: "dl-xfererr"
+  }, monthLabel(date.slice(0, 7)), " is locked for this site \u2014 entries cannot be added."), help, kpis, React.createElement("label", {
+    className: "dl-check"
+  }, React.createElement("input", {
+    type: "checkbox",
+    checked: onlyYest,
+    onChange: e => setOnlyYest(e.target.checked)
+  }), "Show only machines that drew fuel yesterday"), flt.length === 0 ? React.createElement("p", {
+    className: "dl-hint"
+  }, "No ", fuel, " machines on this site yet \u2014 add fuel users first.") : React.createElement("div", {
+    className: "dl-tablewrap"
+  }, React.createElement("table", {
+    className: "dl-table"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Machine"), React.createElement("th", {
+    className: "r"
+  }, "Opening"), React.createElement("th", {
+    className: "r"
+  }, "Closing / time"), React.createElement("th", {
+    className: "r"
+  }, "Litres"), React.createElement("th", {
+    className: "r"
+  }, "Run"), React.createElement("th", {
+    className: "r"
+  }, "Rate"), React.createElement("th", null, "Operator"))), React.createElement("tbody", null, rowsEls))), foot, msg && React.createElement("p", {
+    className: "dl-xfererr"
+  }, msg), React.createElement("div", {
+    className: "dl-formfoot"
+  }, React.createElement("button", {
+    className: "dl-btn",
+    onClick: submit,
+    disabled: locked
+  }, "Save sheet"), React.createElement("p", {
+    className: "dl-legend",
+    style: {
+      margin: 0
+    }
+  }, "Saving writes the machine logbooks and the day's fuel register together.")));
+}
 const MTYPES = ["Routine service", "Repair", "Breakdown"];
 const openDoc = url => {
   if (!url) return;
@@ -7116,6 +7533,18 @@ const css = `
 .dl-snapsite{margin-top:16px;}
 .dl-updrow{display:flex;gap:9px;flex-wrap:wrap;align-items:center;}
 .dl-scopebar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;}
+.dl-sheetnum{width:110px;padding:8px 9px;border:1.5px solid var(--rule);border-radius:var(--r-sm);
+  font-variant-numeric:tabular-nums;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13.5px;}
+.dl-sheetnum.wide{width:150px;}
+.dl-sheetop{width:110px;padding:8px 9px;border:1.5px solid var(--rule);border-radius:var(--r-sm);font-size:12.5px;}
+.dl-times{display:inline-flex;flex-direction:column;gap:4px;}
+.dl-times input{padding:5px 7px;border:1.5px solid var(--rule);border-radius:var(--r-sm);font-size:12.5px;}
+.dl-sheetdone td{background:#E9F5EE;}
+.dl-help{margin:0 0 14px;border:1px solid var(--rule);border-left:4px solid var(--amber);border-radius:var(--r-sm);
+  background:#FFF8EA;padding:10px 14px;font-size:13px;}
+.dl-help summary{cursor:pointer;font-weight:700;font-family:'Oswald','Arial Narrow',sans-serif;
+  letter-spacing:.04em;text-transform:uppercase;font-size:12.5px;}
+.dl-help ol{margin:10px 0 4px;padding-left:20px;line-height:1.7;}
 .dl-iconbtn{width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;
   border:2px solid var(--ink);background:var(--card);color:var(--ink);border-radius:var(--r);
   cursor:pointer;padding:0;font-size:19px;line-height:1;transition:background .12s,color .12s;}
