@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.3.42" />
+<meta name="app-version" content="1.3.43" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -441,7 +441,7 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const APP_VERSION = "1.3.42";
+const APP_VERSION = "1.3.43";
 const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
 const cmpVer = (a, b) => {
   const x = String(a || "").split(".").map(Number);
@@ -2382,7 +2382,7 @@ function DieselLogbook() {
     URL.revokeObjectURL(a.href);
     setNote("CSV downloaded.");
   };
-  const isEquip = machineId !== null && machineId !== STOCK;
+  const isEquip = machineId !== null && machineId !== STOCK && machineId !== SHEET;
   const equipGroups = useMemo(() => {
     const by = {};
     machines.forEach(m => (by[m.category] || (by[m.category] = [])).push(m));
@@ -5445,14 +5445,14 @@ function DaySheet({
       }, React.createElement("td", null, React.createElement("strong", null, m.name), React.createElement("span", {
         className: "dl-sub"
       }, m.code || "")), React.createElement("td", {
-        colSpan: 4,
+        colSpan: 2,
         className: "dl-sub2"
-      }, "\u2713 entered \u2014 ", fmt(litres, 1), " L in ", done.length, " entr", done.length === 1 ? "y" : "ies"), React.createElement("td", {
-        colSpan: 2
+      }, "\u2713 entered \u2014 ", fmt(litres, 1), " L"), React.createElement("td", {
+        className: "r"
       }, React.createElement("button", {
         className: "dl-link",
         onClick: () => onOpenMachine(m.id)
-      }, "add more / edit \u2192")));
+      }, "edit \u2192")));
     }
     const d0 = draft[m.id] || {};
     const pc = prevCloseOf(m);
@@ -5470,9 +5470,7 @@ function DaySheet({
       key: m.id
     }, React.createElement("td", null, React.createElement("strong", null, m.name), React.createElement("span", {
       className: "dl-sub"
-    }, m.code || m.category)), React.createElement("td", {
-      className: "r mono"
-    }, isClock(m) ? "clock" : pc !== null ? fmt(pc, 1) : numIn(d0.open, v => set(m.id, "open", v), "opening")), React.createElement("td", {
+    }, (m.code ? m.code + " \u00b7 " : "") + (isClock(m) ? "clock time" : pc !== null ? "meter at " + fmt(pc, 1) : "no meter history"))), React.createElement("td", {
       className: "r"
     }, isClock(m) ? React.createElement("span", {
       className: "dl-times"
@@ -5486,52 +5484,41 @@ function DaySheet({
       value: d0.stop || "",
       onChange: e => set(m.id, "stop", e.target.value),
       disabled: locked
-    })) : numIn(d0.close, v => set(m.id, "close", v), "closing")), React.createElement("td", {
+    })) : pc !== null ? numIn(d0.close, v => set(m.id, "close", v), "closing") : React.createElement("span", {
+      className: "dl-times"
+    }, numIn(d0.open, v => set(m.id, "open", v), "opening"), numIn(d0.close, v => set(m.id, "close", v), "closing"))), React.createElement("td", {
       className: "r"
     }, numIn(d0.litres, v => set(m.id, "litres", v), "litres")), React.createElement("td", {
-      className: "r mono"
-    }, run > 0 ? fmt(run, 1) : "\u2014"), React.createElement("td", {
-      className: "r mono" + (rateBad(m, eff) ? " flag over" : "")
-    }, eff === null ? "\u2014" : fmt(eff, 2) + " " + unit), React.createElement("td", null, React.createElement("input", {
-      className: "dl-sheetop",
-      value: d0.operator !== undefined ? d0.operator : lastOperator(m),
-      onChange: e => set(m.id, "operator", e.target.value),
-      placeholder: "operator",
-      disabled: locked
-    })));
+      className: "r mono dl-runcell" + (rateBad(m, eff) ? " flag over" : "")
+    }, run > 0 ? fmt(run, 1) + (eff !== null ? " \u00b7 " + fmt(eff, 1) + " " + unit : "") : "\u2014"));
   });
   const kpis = React.createElement("div", {
-    className: "dl-kpis"
-  }, React.createElement(Kpi, {
-    label: "Opening stock",
-    value: firstEver ? "\u2014" : opening === null || opening === undefined ? "\u2014" : fmt(opening, 1),
-    unit: firstEver ? "first day \u2014 enter below" : "litres"
-  }), React.createElement(Kpi, {
-    label: "Received",
-    value: fmt(received, 1),
-    unit: "litres \u00b7 from Purchases"
-  }), React.createElement(Kpi, {
-    label: "Issued so far",
-    value: fmt(issuedAlready, 1),
-    unit: "litres already on the register"
-  }), React.createElement(Kpi, {
-    label: "Remaining",
-    value: fmt(remaining, 1),
-    unit: draftTotal > 0 ? `after the ${fmt(draftTotal, 1)} L on this sheet` : "litres in the tank",
-    alert: remaining < -0.001
-  }));
+    className: "dl-tankstrip"
+  }, React.createElement("span", null, "Tank: opening ", React.createElement("b", null, firstEver ? "\u2014" : opening === null || opening === undefined ? "\u2014" : fmt(opening, 1)), " L"), React.createElement("span", null, "received ", React.createElement("b", null, fmt(received, 1)), " L"), React.createElement("span", null, "issued ", React.createElement("b", null, fmt(issuedAlready + draftTotal, 1)), " L"), React.createElement("span", {
+    className: "dl-tankremain" + (remaining < -0.001 ? " neg" : "")
+  }, "remaining ", React.createElement("b", null, fmt(remaining, 1)), " L"));
   const help = React.createElement("details", {
     className: "dl-help"
-  }, React.createElement("summary", null, "How to enter a day \u2014 3 steps"), React.createElement("ol", null, React.createElement("li", null, "For every machine that drew diesel today, type the closing reading and the litres. The opening reading and operator come up on their own."), React.createElement("li", null, "Watch the Remaining card \u2014 it falls as you type. It must never go below zero."), React.createElement("li", null, "Enter the evening dip if measured, press Save sheet \u2014 the logbook and the fuel register are both written together. Then press the disk icon at the top right to store everything.")));
-  const foot = React.createElement("div", {
+  }, React.createElement("summary", null, "How to enter a day \u2014 3 steps"), React.createElement("ol", null, React.createElement("li", null, "Type the closing reading and litres for every machine that ran."), React.createElement("li", null, "Keep the remaining figure above zero."), React.createElement("li", null, "Press Save sheet, then the disk icon at the top right.")));
+  const foot = React.createElement(React.Fragment, null, firstEver && React.createElement("div", {
     className: "dl-grid",
     style: {
       marginTop: 14
     }
-  }, firstEver && React.createElement(F, {
+  }, React.createElement(F, {
     label: "Opening stock (first day, litres)",
     accent: true
-  }, numIn(openingFirst, setOpeningFirst, "e.g. 500")), React.createElement(F, {
+  }, numIn(openingFirst, setOpeningFirst, "e.g. 500"))), React.createElement("details", {
+    className: "dl-help",
+    style: {
+      marginTop: 14
+    }
+  }, React.createElement("summary", null, "More \u2014 physical dip, other issue, remarks"), React.createElement("div", {
+    className: "dl-grid",
+    style: {
+      marginTop: 10
+    }
+  }, React.createElement(F, {
     label: "Other issue (L) \u2014 optional"
   }, numIn(other.qty, v => setOther({
     ...other,
@@ -5555,12 +5542,12 @@ function DaySheet({
     value: rem,
     onChange: e => setRem(e.target.value),
     disabled: locked
-  })));
+  })))));
   return React.createElement("section", {
     className: "dl-panel dl-sheet"
   }, React.createElement("div", {
     className: "dl-panelhead"
-  }, React.createElement("div", null, React.createElement("h2", null, "Today's sheet \u2014 ", site.nick || site.name), React.createElement("p", null, "One line per machine \u2014 closing reading and litres. Everything else fills itself.")), React.createElement("div", {
+  }, React.createElement("div", null, React.createElement("h2", null, "Today's sheet \u2014 ", site.nick || site.name), React.createElement("p", null, "Closing reading and litres per machine \u2014 the rest fills itself.")), React.createElement("div", {
     className: "dl-rowbtns"
   }, React.createElement("label", {
     className: "dl-field dl-inline"
@@ -5574,10 +5561,7 @@ function DaySheet({
     key: f,
     className: fuel === f ? "on" : "",
     onClick: () => setFuel(f)
-  }, f))), React.createElement("button", {
-    className: "dl-btn ghost",
-    onClick: onAddMachine
-  }, "+ Fuel user"))), locked && React.createElement("p", {
+  }, f))))), locked && React.createElement("p", {
     className: "dl-xfererr"
   }, monthLabel(date.slice(0, 7)), " is locked for this site \u2014 entries cannot be added."), help, kpis, React.createElement("label", {
     className: "dl-check"
@@ -5593,15 +5577,11 @@ function DaySheet({
     className: "dl-table"
   }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Machine"), React.createElement("th", {
     className: "r"
-  }, "Opening"), React.createElement("th", {
-    className: "r"
   }, "Closing / time"), React.createElement("th", {
     className: "r"
   }, "Litres"), React.createElement("th", {
     className: "r"
-  }, "Run"), React.createElement("th", {
-    className: "r"
-  }, "Rate"), React.createElement("th", null, "Operator"))), React.createElement("tbody", null, rowsEls))), foot, msg && React.createElement("p", {
+  }, "Run \u00b7 rate"))), React.createElement("tbody", null, rowsEls))), foot, msg && React.createElement("p", {
     className: "dl-xfererr"
   }, msg), React.createElement("div", {
     className: "dl-formfoot"
@@ -7545,6 +7525,12 @@ const css = `
 .dl-times{display:inline-flex;flex-direction:column;gap:4px;}
 .dl-times input{padding:5px 7px;border:1.5px solid var(--rule);border-radius:var(--r-sm);font-size:12.5px;}
 .dl-sheetdone td{background:#E9F5EE;}
+.dl-tankstrip{display:flex;gap:18px;flex-wrap:wrap;align-items:baseline;margin:2px 0 14px;
+  padding:10px 14px;background:var(--card);border:1px solid var(--rule);border-left:4px solid var(--amber);
+  border-radius:var(--r-sm);font-size:13px;color:var(--steel);}
+.dl-tankstrip b{font-family:'IBM Plex Mono',ui-monospace,monospace;color:var(--ink);font-size:14.5px;}
+.dl-tankremain.neg,.dl-tankremain.neg b{color:var(--over);}
+.dl-runcell{white-space:nowrap;font-size:12.5px;}
 .dl-help{margin:0 0 14px;border:1px solid var(--rule);border-left:4px solid var(--amber);border-radius:var(--r-sm);
   background:#FFF8EA;padding:10px 14px;font-size:13px;}
 .dl-help summary{cursor:pointer;font-weight:700;font-family:'Oswald','Arial Narrow',sans-serif;
