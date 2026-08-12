@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.3.33" />
+<meta name="app-version" content="1.3.34" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -440,7 +440,7 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const APP_VERSION = "1.3.33";
+const APP_VERSION = "1.3.34";
 const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
 const cmpVer = (a, b) => {
   const x = String(a || "").split(".").map(Number);
@@ -2542,6 +2542,7 @@ function DieselLogbook() {
     overview: overview,
     rates: rates,
     month: month,
+    onMonth: setMonth,
     trend: trend,
     onAddSite: () => setDialog("site"),
     onOpen: (sid, mid) => {
@@ -3212,13 +3213,16 @@ function Dashboard({
   alerts,
   onAlerts,
   onOpen,
-  onAddSite
+  onAddSite,
+  onMonth
 }) {
   const [sortBy, setSortBy] = useState("variance");
   const [fuel, setFuel] = useState("HSD");
   const [drill, setDrill] = useState(null);
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState("all");
   const [snapDate, setSnapDate] = useState(null);
+  const [scopeSiteId, setScopeSiteId] = useState(null);
+  const [scopeMachId, setScopeMachId] = useState(null);
   const sites = overview.map(s => {
     const rows = s.rows.filter(r => r.fuel === fuel);
     const st = s.fuelStock && s.fuelStock[fuel] || {};
@@ -3242,6 +3246,55 @@ function Dashboard({
     rows: [],
     keys: []
   };
+  const scopeSiteObj = data.sites.find(s => s.id === scopeSiteId) || data.sites[0] || null;
+  const allMachines = data.sites.flatMap(s => s.machines.map(m => ({
+    m,
+    site: s
+  })));
+  const scopeMachEntry = allMachines.find(x => x.m.id === scopeMachId) || allMachines[0] || null;
+  const scopeLabel = tab === "sitesp" ? scopeSiteObj ? scopeSiteObj.nick || scopeSiteObj.name : "site" : tab === "machsp" ? scopeMachEntry ? scopeMachEntry.m.name : "machine" : "all sites";
+  const scopedRows = tab === "sitesp" && scopeSiteObj ? allRows.filter(r => r.site.id === scopeSiteObj.id) : tab === "machsp" && scopeMachEntry ? allRows.filter(r => r.m.id === scopeMachEntry.m.id) : allRows;
+  const monthsAvail = useMemo(() => {
+    const seen = new Set();
+    Object.values(data.stock || {}).forEach(l => (l || []).forEach(e => e.date && seen.add(e.date.slice(0, 7))));
+    Object.values(data.logs || {}).forEach(l => (l || []).forEach(e => e.date && seen.add(e.date.slice(0, 7))));
+    return Array.from(seen).sort().reverse();
+  }, [data]);
+  const scopedTrend = useMemo(() => {
+    if (tab === "all") return [];
+    const by = {};
+    const machs = tab === "sitesp" ? (scopeSiteObj ? scopeSiteObj.machines : []) : scopeMachEntry ? [scopeMachEntry.m] : [];
+    machs.forEach(m => {
+      if (fuelOf(m) !== fuel) return;
+      (data.logs[m.id] || []).forEach(e => {
+        if (num(e.litres) > 0 && e.date) by[e.date.slice(0, 7)] = (by[e.date.slice(0, 7)] || 0) + num(e.litres);
+      });
+    });
+    return Object.keys(by).sort().map(k => ({
+      label: monthLabel(k),
+      litres: +by[k].toFixed(1)
+    }));
+  }, [tab, scopeSiteId, scopeMachId, data, fuel]);
+  const machDaily = useMemo(() => {
+    if (tab !== "machsp" || !scopeMachEntry) return [];
+    const m = scopeMachEntry.m;
+    const mOk = dt => month === "all" || (dt || "").slice(0, 7) === month;
+    const days = {};
+    (data.logs[m.id] || []).forEach(e => {
+      if (!mOk(e.date)) return;
+      const o = days[e.date] || (days[e.date] = {
+        date: e.date,
+        litres: 0,
+        run: 0,
+        entries: []
+      });
+      o.litres += num(e.litres);
+      o.run += calcRow(e, m).run;
+      o.entries.push(e);
+    });
+    const rows = Object.values(days).sort((a, b) => a.date < b.date ? 1 : -1);
+    return month === "all" ? rows.slice(0, 31) : rows;
+  }, [tab, scopeMachId, data, month]);
   const daily = useMemo(() => {
     const days = {};
     const mOk = dt => month === "all" || (dt || "").slice(0, 7) === month;
@@ -3262,7 +3315,7 @@ function Dashboard({
       issues: [],
       directRows: []
     });
-    data.sites.forEach(s => {
+    (tab === "sitesp" && scopeSiteObj ? data.sites.filter(s => s.id === scopeSiteObj.id) : data.sites).forEach(s => {
       buildStock(data.stock[s.id] || [], siteFleet(data, s), fuel).forEach(r => {
         if (!mOk(r.e.date)) return;
         const o = dayOf(r.e.date);
@@ -3305,7 +3358,7 @@ function Dashboard({
       o.closing = cls.length ? cls.reduce((a, c) => a + c.closing, 0) : null;
     });
     return month === "all" ? rows.slice(0, 31) : rows;
-  }, [data, month, fuel]);
+  }, [data, month, fuel, tab, scopeSiteId]);
   const machineCount = new Set(allRows.map(r => r.m.id)).size;
   const purchased = sites.reduce((a, b) => a + (b.st.received || 0), 0);
   const purchaseValue = sites.reduce((a, b) => a + (b.st.value || 0), 0);
@@ -3351,15 +3404,20 @@ function Dashboard({
       Own: Math.round(o)
     };
   }).filter(x => x.Hired > 0 || x.Own > 0);
+  const scopedPlantRows = tab === "sitesp" && scopeSiteObj ? plantRows.filter(x => x.r.site.id === scopeSiteObj.id) : tab === "machsp" && scopeMachEntry ? plantRows.filter(x => x.r.m.id === scopeMachEntry.m.id) : plantRows;
+  const scopedHired = scopedPlantRows.filter(x => x.r.own === "Hired").reduce((a, x) => a + x.cost, 0);
+  const scopedOwn = scopedPlantRows.reduce((a, x) => a + x.cost, 0) - scopedHired;
+  const scopeMachineList = tab === "sitesp" && scopeSiteObj ? scopeSiteObj.machines : tab === "machsp" && scopeMachEntry ? [scopeMachEntry.m] : data.sites.flatMap(s => s.machines);
+  const scopedMaint = scopeMachineList.reduce((a, m) => a + (((data.maint || {})[m.id]) || []).filter(r => month === "all" || (r.date || "").slice(0, 7) === month).reduce((x, y) => x + num(y.cost), 0), 0);
   const useSplit = USAGE.map(u => {
-    const rs = allRows.filter(r => r.usage === u);
+    const rs = scopedRows.filter(r => r.usage === u);
     return {
       name: u,
       value: +rs.reduce((a, b) => a + b.litres, 0).toFixed(0),
       count: rs.length
     };
   }).concat((() => {
-    const rs = allRows.filter(r => !r.usage);
+    const rs = scopedRows.filter(r => !r.usage);
     return rs.length ? [{
       name: "Not set",
       value: +rs.reduce((a, b) => a + b.litres, 0).toFixed(0),
@@ -3433,15 +3491,46 @@ function Dashboard({
       display: "inline-flex"
     }
   }, React.createElement("button", {
-    className: tab === "overview" ? "on" : "",
-    onClick: () => setTab("overview")
-  }, "Overview — all sites"), React.createElement("button", {
-    className: tab === "sitewise" ? "on" : "",
-    onClick: () => setTab("sitewise")
-  }, "Site-wise"), React.createElement("button", {
-    className: tab === "machines" ? "on" : "",
-    onClick: () => setTab("machines")
-  }, "Machine-wise")), tab === "overview" && React.createElement("div", {
+    className: tab === "all" ? "on" : "",
+    onClick: () => setTab("all")
+  }, "All sites"), React.createElement("button", {
+    className: tab === "sitesp" ? "on" : "",
+    onClick: () => setTab("sitesp")
+  }, "Site-specific"), React.createElement("button", {
+    className: tab === "machsp" ? "on" : "",
+    onClick: () => setTab("machsp")
+  }, "Machine-specific")), React.createElement("div", {
+    className: "dl-scopebar"
+  }, tab === "sitesp" && React.createElement("label", {
+    className: "dl-field dl-inline"
+  }, React.createElement("span", null, "Site"), React.createElement("select", {
+    value: scopeSiteObj ? scopeSiteObj.id : "",
+    onChange: e => setScopeSiteId(e.target.value)
+  }, data.sites.map(s => React.createElement("option", {
+    key: s.id,
+    value: s.id
+  }, s.name)))), tab === "machsp" && React.createElement("label", {
+    className: "dl-field dl-inline dl-equipsel"
+  }, React.createElement("span", null, "Fuel user"), React.createElement("select", {
+    value: scopeMachEntry ? scopeMachEntry.m.id : "",
+    onChange: e => setScopeMachId(e.target.value)
+  }, data.sites.map(s => React.createElement("optgroup", {
+    key: s.id,
+    label: s.nick || s.name
+  }, s.machines.map(m => React.createElement("option", {
+    key: m.id,
+    value: m.id
+  }, m.name, m.code ? ` — ${m.code}` : "")))))), React.createElement("label", {
+    className: "dl-field dl-inline"
+  }, React.createElement("span", null, "Month"), React.createElement("select", {
+    value: month,
+    onChange: e => onMonth(e.target.value)
+  }, React.createElement("option", {
+    value: "all"
+  }, "All months"), monthsAvail.map(k => React.createElement("option", {
+    key: k,
+    value: k
+  }, monthLabel(k)))))), tab === "all" && React.createElement("div", {
     className: "dl-kpis"
   }, React.createElement(Kpi, {
     label: `${fuel} purchased`,
@@ -3477,13 +3566,13 @@ function Dashboard({
     unit: "expired or due soon \u00b7 own machines",
     alert: !!(alerts && alerts.some(a => a.kind === "doc" || a.kind === "service")),
     onClick: onAlerts
-  })), tab === "overview" && React.createElement("p", {
+  })), tab === "all" && React.createElement("p", {
     className: "dl-legend"
-  }, "Every figure above opens its detail — click a card. ", entries, " entries in this period."), tab === "overview" && React.createElement("div", {
+  }, "Every figure above opens its detail — click a card. ", entries, " entries in this period."), tab !== "machsp" && React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
-  }, "Daily snapshot — ", fuel, month === "all" ? " · last 31 active days" : " · " + monthLabel(month)), daily.length === 0 ? React.createElement("p", {
+  }, "Daily snapshot — ", fuel, " · ", scopeLabel, month === "all" ? " · last 31 active days" : " · " + monthLabel(month)), daily.length === 0 ? React.createElement("p", {
     className: "dl-hint"
   }, "No activity in this period yet.") : (() => {
     const sel = daily.find(x => x.date === snapDate) || daily[0];
@@ -3547,7 +3636,7 @@ function Dashboard({
     }, fmt(x.qty, 1))))))))));
   })(), React.createElement("p", {
     className: "dl-legend"
-  }, "Pick a date to see that day's position across the company, site by site. Opening stock is the previous day's closing carried forward — opening + purchased − tank issues = closing. Fuel taken direct from the pump counts in Consumed but never touches the tank, so it does not move closing stock. Click a fuel user to open its logbook.")), tab === "sitewise" && React.createElement("div", {
+  }, "Pick a date to see that day's position across the company, site by site. Opening stock is the previous day's closing carried forward — opening + purchased − tank issues = closing. Fuel taken direct from the pump counts in Consumed but never touches the tank, so it does not move closing stock. Click a fuel user to open its logbook.")), tab === "all" && React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
@@ -3645,39 +3734,7 @@ function Dashboard({
     colSpan: 2
   }))))), React.createElement("p", {
     className: "dl-legend"
-  }, "Figures are for one month at a time. Choosing “All” in the month filter breaks each site out month by month rather than lumping them together. Daily averages are over days a fuel report was actually raised, not calendar days — so a site reporting five days out of thirty is not made to look thrifty. Days cover is stock in hand divided by that site’s daily burn.")), tab === "machines" && React.createElement("div", {
-    className: "dl-block"
-  }, React.createElement("h3", {
-    className: "dl-blockhead"
-  }, "Machine-wise distribution of ", fuel, " at each site"), React.createElement("div", {
-    className: "dl-splits"
-  }, sites.filter(s => s.litres > 0).map(s => {
-    const rows = s.rows.filter(r => r.litres > 0).sort((a, b) => b.litres - a.litres);
-    const top = rows[0] ? rows[0].litres : 1;
-    return React.createElement("div", {
-      className: "dl-split",
-      key: s.site.id
-    }, React.createElement("h4", null, s.site.nick || s.site.name, React.createElement("span", null, fmt(s.litres, 0), " L")), rows.map(r => React.createElement("div", {
-      className: "dl-splitrow",
-      key: (r.site ? r.site.id + ":" : "") + r.m.id,
-      onClick: () => onOpen(r.site.id, r.m.id)
-    }, React.createElement("span", {
-      className: "dl-splitname"
-    }, r.m.name), React.createElement("span", {
-      className: "dl-splitbar"
-    }, React.createElement("i", {
-      className: r.status,
-      style: {
-        width: Math.max(2, r.litres / top * 100) + "%"
-      }
-    })), React.createElement("span", {
-      className: "dl-splitval"
-    }, fmt(r.litres, 0)), React.createElement("span", {
-      className: "dl-splitpc"
-    }, pct(r.litres, s.litres)))));
-  })), React.createElement("p", {
-    className: "dl-legend"
-  }, "Bar colour follows the machine’s standing against its standard, so a long red bar is a heavy machine that is also inefficient — the first place to look.")), tab === "overview" && React.createElement(Guard, {
+  }, "Figures are for one month at a time. Choosing “All” in the month filter breaks each site out month by month rather than lumping them together. Daily averages are over days a fuel report was actually raised, not calendar days — so a site reporting five days out of thirty is not made to look thrifty. Days cover is stock in hand divided by that site’s daily burn.")), tab === "all" && React.createElement(Guard, {
     label: "The charts could not be drawn"
   }, React.createElement("div", {
     className: "dl-charts"
@@ -3752,7 +3809,7 @@ function Dashboard({
     wrapperStyle: LEG
   }))), React.createElement("p", {
     className: "dl-legend"
-  }, "Work-oriented burn earns money; ancillary and camp are overheads. A growing overhead share is the thing to catch early.")))), tab === "overview" && React.createElement("div", {
+  }, "Work-oriented burn earns money; ancillary and camp are overheads. A growing overhead share is the thing to catch early.")))), tab === "all" && React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
@@ -3824,35 +3881,168 @@ function Dashboard({
     maxBarSize: 60
   })))), React.createElement("p", {
     className: "dl-legend"
-  }, "Kept apart from the fuel figures above. Hired is the committed hire per month at current rates; Own is the owning cost entered against own machines. Click any card for the site-wise and machine-wise break-up.")), tab === "sitewise" && React.createElement("div", {
+  }, "Kept apart from the fuel figures above. Hired is the committed hire per month at current rates; Own is the owning cost entered against own machines. Click any card for the site-wise and machine-wise break-up.")), tab === "machsp" && React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
-  }, "Site by site"), React.createElement("div", {
-    className: "dl-sitecards"
-  }, sites.map(s => React.createElement("article", {
-    className: "dl-sitecard",
-    key: s.site.id
-  }, React.createElement("header", {
-    onClick: () => onOpen(s.site.id, null)
-  }, React.createElement("h4", null, s.site.nick || s.site.name), React.createElement("span", {
-    className: "dl-cardsub"
-  }, s.site.client || s.site.name, s.site.location ? ` · ${s.site.location}` : ""), s.site.code && React.createElement("span", {
-    className: "mono"
-  }, s.site.code)), React.createElement("div", {
-    className: "dl-scnums"
-  }, React.createElement("div", null, React.createElement("em", null, "Purchased"), React.createElement("b", null, fmt(s.st.received || 0, 0), " L")), React.createElement("div", null, React.createElement("em", null, "Consumed"), React.createElement("b", null, fmt(s.st.issued || s.litres, 0), " L")), React.createElement("div", null, React.createElement("em", null, "In hand"), React.createElement("b", null, s.st.closing === null || s.st.closing === undefined ? "—" : fmt(s.st.closing, 0) + " L")), React.createElement("div", null, React.createElement("em", null, "Cost"), React.createElement("b", null, "₹ ", fmt(s.cost, 0)))), React.createElement("dl", {
-    className: "dl-scfacts"
-  }, React.createElement("div", null, React.createElement("dt", null, "Heaviest user"), React.createElement("dd", null, s.heaviest && s.heaviest.litres > 0 ? `${s.heaviest.m.name} · ${fmt(s.heaviest.litres, 0)} L` : "—")), React.createElement("div", null, React.createElement("dt", null, "Furthest off standard"), React.createElement("dd", {
-    className: s.worst && s.worst.variance > 5 ? "bad" : ""
-  }, s.worst ? `${s.worst.m.name} · ${s.worst.variance >= 0 ? "+" : ""}${fmt(s.worst.variance, 1)}%` : "no standards set")), React.createElement("div", null, React.createElement("dt", null, "Above standard"), React.createElement("dd", {
-    className: s.over > 0 ? "bad" : ""
-  }, s.over, " of ", s.rows.length, s.idle > 0 ? ` · ${s.idle} idle` : "")), React.createElement("div", null, React.createElement("dt", null, "Last report"), React.createElement("dd", {
-    className: "mono"
-  }, s.last || "—"))), React.createElement("button", {
-    className: "dl-link",
-    onClick: () => onOpen(s.site.id, null)
-  }, "open site dashboard →"))))), drill && React.createElement(DrillDown, {
+  }, "Daily snapshot — ", scopeLabel, month === "all" ? " · last 31 active days" : " · " + monthLabel(month)), machDaily.length === 0 ? React.createElement("p", {
+    className: "dl-hint"
+  }, "No entries for this machine in this period.") : (() => {
+    const sel = machDaily.find(x => x.date === snapDate) || machDaily[0];
+    const mm = scopeMachEntry.m;
+    const u = mm.meterType === "km" ? "km" : "hrs";
+    return React.createElement(React.Fragment, null, React.createElement("div", {
+      className: "dl-datetabs"
+    }, machDaily.map(dy => React.createElement("button", {
+      key: dy.date,
+      className: "dl-datetab" + (dy.date === sel.date ? " on" : ""),
+      onClick: () => setSnapDate(dy.date)
+    }, dayLabel(dy.date)))), React.createElement("div", {
+      className: "dl-kpis",
+      style: {
+        marginTop: 6
+      }
+    }, React.createElement(Kpi, {
+      label: "Consumed",
+      value: fmt(sel.litres, 1),
+      unit: "litres · " + sel.date
+    }), React.createElement(Kpi, {
+      label: mm.meterType === "km" ? "Distance" : "Run",
+      value: fmt(sel.run, 1),
+      unit: u
+    }), React.createElement(Kpi, {
+      label: "Entries",
+      value: sel.entries.length,
+      unit: "logbook entr" + (sel.entries.length === 1 ? "y" : "ies")
+    }), React.createElement(Kpi, {
+      label: "Consumption",
+      value: sel.run > 0 ? mm.meterType === "km" ? fmt(sel.run / Math.max(sel.litres, 0.001), 2) : fmt(sel.litres / sel.run, 2) : "—",
+      unit: mm.meterType === "km" ? "km/L that day" : "L/hr that day"
+    })), React.createElement("div", {
+      className: "dl-tablewrap"
+    }, React.createElement("table", {
+      className: "dl-table"
+    }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Source"), React.createElement("th", {
+      className: "r"
+    }, "Open"), React.createElement("th", {
+      className: "r"
+    }, "Close"), React.createElement("th", {
+      className: "r"
+    }, "Run"), React.createElement("th", {
+      className: "r"
+    }, "Litres"), React.createElement("th", null, "Work"))), React.createElement("tbody", null, sel.entries.map(e => React.createElement("tr", {
+      key: e.id,
+      className: "click",
+      onClick: () => onOpen(e.siteId || (scopeMachEntry.site && scopeMachEntry.site.id), mm.id)
+    }, React.createElement("td", {
+      className: "dl-sub2"
+    }, e.source || "Site tank"), React.createElement("td", {
+      className: "r mono"
+    }, e.open || "—"), React.createElement("td", {
+      className: "r mono"
+    }, e.close || "—"), React.createElement("td", {
+      className: "r mono"
+    }, fmt(calcRow(e, mm).run, 1)), React.createElement("td", {
+      className: "r mono"
+    }, React.createElement("strong", null, fmt(num(e.litres), 1))), React.createElement("td", {
+      className: "dl-sub2"
+    }, e.work || "—")))))), React.createElement("p", {
+      className: "dl-legend"
+    }, "Pick a date for that day's entries. Click a row to open the machine's logbook."));
+  })()), tab !== "all" && React.createElement(Guard, {
+    label: "The charts could not be drawn"
+  }, React.createElement("div", {
+    className: "dl-charts"
+  }, scopedTrend.length > 0 && React.createElement("div", {
+    className: "dl-chart wide"
+  }, React.createElement("h3", {
+    className: "dl-blockhead"
+  }, fuel, " logged by month — ", scopeLabel), React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 250
+  }, React.createElement(BarChart, {
+    data: scopedTrend,
+    margin: {
+      top: 8,
+      right: 8,
+      left: 0,
+      bottom: 0
+    }
+  }, React.createElement(CartesianGrid, {
+    stroke: "#E4E9EE",
+    vertical: false
+  }), React.createElement(XAxis, {
+    dataKey: "label",
+    tick: AX,
+    axisLine: AXL,
+    tickLine: false
+  }), React.createElement(YAxis, {
+    tick: AX,
+    axisLine: AXL,
+    tickLine: false,
+    width: 48,
+    unit: " L"
+  }), React.createElement(Tooltip, {
+    ...TIP,
+    formatter: v => [`${fmt(v, 1)} L`, "logged"]
+  }), React.createElement(Bar, {
+    dataKey: "litres",
+    fill: "#DE8500",
+    maxBarSize: 46
+  })))), useSplit.length > 0 && React.createElement("div", {
+    className: "dl-chart"
+  }, React.createElement("h3", {
+    className: "dl-blockhead"
+  }, "Where the ", fuel, " goes — ", scopeLabel), React.createElement(ResponsiveContainer, {
+    width: "100%",
+    height: 250
+  }, React.createElement(PieChart, null, React.createElement(Pie, {
+    data: useSplit,
+    dataKey: "value",
+    nameKey: "name",
+    innerRadius: 52,
+    outerRadius: 82,
+    paddingAngle: 2,
+    stroke: "#fff",
+    label: d => `${(d.percent * 100).toFixed(0)}%`
+  }, useSplit.map(u => React.createElement(Cell, {
+    key: u.name,
+    fill: {
+      "Work oriented": "#12294A",
+      "Ancillary": "#DE8500",
+      "Camp establishment": "#3A6EA5",
+      "Not set": "#8B97A8"
+    }[u.name] || "#5C7A9E"
+  }))), React.createElement(Tooltip, {
+    ...TIP,
+    formatter: (v, n) => [`${fmt(v, 0)} L · ${pct(v, useSplit.reduce((a, b) => a + b.value, 0))}`, n]
+  }), React.createElement(Legend, {
+    wrapperStyle: LEG
+  })))))), tab !== "all" && React.createElement("div", {
+    className: "dl-block"
+  }, React.createElement("h3", {
+    className: "dl-blockhead"
+  }, "Equipment cost — ", scopeLabel), React.createElement("div", {
+    className: "dl-kpis"
+  }, React.createElement(Kpi, {
+    label: "Hired machines",
+    value: "₹ " + fmt(scopedHired, 0),
+    unit: `per month · ${scopedPlantRows.filter(x => x.r.own === "Hired").length} machine(s)`
+  }), React.createElement(Kpi, {
+    label: "Own machines",
+    value: "₹ " + fmt(scopedOwn, 0),
+    unit: `per month · ${scopedPlantRows.filter(x => x.r.own !== "Hired").length} machine(s) costed`
+  }), React.createElement(Kpi, {
+    label: "Total equipment cost",
+    value: "₹ " + fmt(scopedHired + scopedOwn, 0),
+    unit: "per month"
+  }), React.createElement(Kpi, {
+    label: "Maintenance spend",
+    value: "₹ " + fmt(scopedMaint, 0),
+    unit: (month === "all" ? "all months" : monthLabel(month)) + " · from maintenance records"
+  })), React.createElement("p", {
+    className: "dl-legend"
+  }, "Hire and owning costs are monthly commitments for the machines in this view; maintenance spend follows the month chosen above.")), drill && React.createElement(DrillDown, {
     which: drill,
     fuel: fuel,
     sites: sites,
@@ -7050,6 +7240,7 @@ const css = `
 .dl-datetab.on{background:var(--ink);border-color:var(--ink);color:#fff;}
 .dl-snapsite{margin-top:16px;}
 .dl-updrow{display:flex;gap:9px;flex-wrap:wrap;align-items:center;}
+.dl-scopebar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;}
 .dl-iconbtn{width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;
   border:2px solid var(--ink);background:var(--card);color:var(--ink);border-radius:var(--r);
   cursor:pointer;padding:0;font-size:19px;line-height:1;transition:background .12s,color .12s;}
