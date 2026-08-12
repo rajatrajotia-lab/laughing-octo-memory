@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.3.36" />
+<meta name="app-version" content="1.3.37" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -440,7 +440,7 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const APP_VERSION = "1.3.36";
+const APP_VERSION = "1.3.37";
 const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
 const cmpVer = (a, b) => {
   const x = String(a || "").split(".").map(Number);
@@ -3605,7 +3605,7 @@ function Dashboard({
       label: "Closing stock",
       value: sel.closing === null ? "—" : fmt(sel.closing, 1),
       unit: "litres"
-    })), Object.values(sel.sites).map(c => React.createElement("div", {
+    })), (tab === "sitesp" ? Object.values(sel.sites) : []).map(c => React.createElement("div", {
       key: c.site.id,
       className: "dl-snapsite"
     }, React.createElement("h4", {
@@ -3637,105 +3637,7 @@ function Dashboard({
     }, fmt(x.qty, 1))))))))));
   })(), React.createElement("p", {
     className: "dl-legend"
-  }, "Pick a date to see that day's position across the company, site by site. Opening stock is the previous day's closing carried forward — opening + purchased − tank issues = closing. Fuel taken direct from the pump counts in Consumed but never touches the tank, so it does not move closing stock. Click a fuel user to open its logbook.")), tab === "all" && React.createElement("div", {
-    className: "dl-block"
-  }, React.createElement("h3", {
-    className: "dl-blockhead"
-  }, fuel, " purchase and consumption by site —", " ", month === "all" ? "month by month" : monthLabel(month)), React.createElement("div", {
-    className: "dl-tablewrap"
-  }, React.createElement("table", {
-    className: "dl-table"
-  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Site"), React.createElement("th", null, "Month"), React.createElement("th", {
-    className: "r"
-  }, "Days reported"), React.createElement("th", {
-    className: "r"
-  }, "Opening stock"), React.createElement("th", {
-    className: "r"
-  }, "Purchased"), React.createElement("th", {
-    className: "r"
-  }, "Consumed"), React.createElement("th", {
-    className: "r"
-  }, "Avg daily purchase"), React.createElement("th", {
-    className: "r"
-  }, "Avg daily consumption"), React.createElement("th", {
-    className: "r"
-  }, "Stock in hand"), React.createElement("th", {
-    className: "r"
-  }, "Days cover"), React.createElement("th", null, "Last report"))), React.createElement("tbody", null, sites.flatMap(s => {
-    const periods = month === "all" ? (s.st.months || []).map(mo => ({
-      key: s.site.id + mo.month,
-      label: monthLabel(mo.month),
-      ...mo
-    })) : [{
-      key: s.site.id,
-      label: monthLabel(month),
-      days: s.st.days,
-      received: s.st.received,
-      issued: s.st.issued,
-      closing: s.st.closing,
-      last: s.st.last
-    }];
-    if (periods.length === 0) periods.push({
-      key: s.site.id,
-      label: monthLabel(month === "all" ? today().slice(0, 7) : month),
-      days: 0,
-      received: 0,
-      issued: 0,
-      closing: s.st.closing,
-      last: ""
-    });
-    return periods.map((pd, idx) => {
-      const d = pd.days || 0;
-      const burn = d ? (pd.issued || 0) / d : 0;
-      const buy = d ? (pd.received || 0) / d : 0;
-      const c = pd.closing;
-      return React.createElement("tr", {
-        key: pd.key,
-        className: "click",
-        onClick: () => onOpen(s.site.id, STOCK)
-      }, React.createElement("td", null, React.createElement("strong", null, s.site.nick || s.site.name), React.createElement("span", {
-        className: "dl-sub"
-      }, idx === 0 ? s.site.name : "")), React.createElement("td", {
-        className: "dl-sub2"
-      }, pd.label), React.createElement("td", {
-        className: "r mono"
-      }, d || "—"), React.createElement("td", {
-        className: "r mono"
-      }, c === null || c === undefined ? "—" : fmt(c - (pd.received || 0) + (pd.issued || 0), 1)), React.createElement("td", {
-        className: "r mono"
-      }, fmt(pd.received || 0, 1)), React.createElement("td", {
-        className: "r mono"
-      }, React.createElement("strong", null, fmt(pd.issued || 0, 1))), React.createElement("td", {
-        className: "r mono"
-      }, d ? fmt(buy, 1) : "—"), React.createElement("td", {
-        className: "r mono"
-      }, d ? fmt(burn, 1) : "—"), React.createElement("td", {
-        className: "r mono"
-      }, c === null || c === undefined ? "—" : fmt(c, 1)), React.createElement("td", {
-        className: "r mono" + (burn > 0 && (c || 0) / burn < 2 ? " flag over" : "")
-      }, burn > 0 ? fmt((c || 0) / burn, 1) : "—"), React.createElement("td", {
-        className: "mono dl-sub2"
-      }, pd.last || "—", s.st.locked && React.createElement("span", {
-        className: "dl-cond"
-      }, " locked")));
-    });
-  })), month !== "all" && React.createElement("tfoot", null, React.createElement("tr", null, React.createElement("td", {
-    colSpan: 3
-  }, "All sites — ", monthLabel(month)), React.createElement("td", {
-    className: "r mono"
-  }, fmt(inHand - purchased + issuedStock, 1)), React.createElement("td", {
-    className: "r mono"
-  }, fmt(purchased, 1)), React.createElement("td", {
-    className: "r mono"
-  }, fmt(issuedStock, 1)), React.createElement("td", {
-    colSpan: 2
-  }), React.createElement("td", {
-    className: "r mono"
-  }, fmt(inHand, 1)), React.createElement("td", {
-    colSpan: 2
-  }))))), React.createElement("p", {
-    className: "dl-legend"
-  }, "Figures are for one month at a time. Choosing “All” in the month filter breaks each site out month by month rather than lumping them together. Daily averages are over days a fuel report was actually raised, not calendar days — so a site reporting five days out of thirty is not made to look thrifty. Days cover is stock in hand divided by that site’s daily burn.")), tab === "all" && React.createElement(Guard, {
+  }, "Pick a date to see that day's position across the company, site by site. Opening stock is the previous day's closing carried forward — opening + purchased − tank issues = closing. Fuel taken direct from the pump counts in Consumed but never touches the tank, so it does not move closing stock. Click a fuel user to open its logbook.")), tab === "all" && React.createElement(Guard, {
     label: "The charts could not be drawn"
   }, React.createElement("div", {
     className: "dl-charts"
