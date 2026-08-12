@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.3.38" />
+<meta name="app-version" content="1.3.39" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -440,7 +440,7 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const APP_VERSION = "1.3.38";
+const APP_VERSION = "1.3.39";
 const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
 const cmpVer = (a, b) => {
   const x = String(a || "").split(".").map(Number);
@@ -2376,16 +2376,9 @@ function DieselLogbook() {
   }, React.createElement("span", {
     className: "dl-lockicon",
     "aria-hidden": "true"
-  }), locked ? "Locked" : "Management"), React.createElement("button", {
+  }), locked ? "Locked" : "Management"), React.createElement("span", {
     className: "dl-save " + saveState,
-    style: {
-      background: "none",
-      border: "none",
-      cursor: "pointer",
-      font: "inherit"
-    },
-    onClick: saveNow,
-    title: saveState === "error" ? "This device is not accepting saved data — click to retry" : "Click to save now" + (savedAt ? " · last saved " + savedAt.toLocaleTimeString() : "")
+    title: saveState === "error" ? "This device is not accepting saved data" : savedAt ? "Last saved " + savedAt.toLocaleTimeString() : ""
   }, React.createElement("span", {
     className: "dl-savedot"
   }), saveState === "error" ? "Not saved" : saveState === "dirty" ? "Unsaved — press Save" : saveState === "saved" ? savedAt ? React.createElement(React.Fragment, null, "Saved", React.createElement("span", {
@@ -2584,9 +2577,7 @@ function DieselLogbook() {
     value: m.id
   }, m.name, m.code ? ` — ${m.code}` : "")))))), React.createElement("div", {
     className: "dl-navend"
-  }, React.createElement("span", {
-    className: "dl-navstat"
-  }, stockFuel, " in hand ", React.createElement("b", null, fmt(stockInHand, 1), " L")), React.createElement("button", {
+  }, React.createElement("button", {
     className: "dl-btn ghost",
     onClick: () => setDialog("machine")
   }, "+ Fuel user"))), machineId === null ? React.createElement("section", {
@@ -2603,26 +2594,7 @@ function DieselLogbook() {
   }, "Edit site"), React.createElement("button", {
     className: "dl-btn ghost",
     onClick: exportCSV
-  }, "Export CSV"))), React.createElement("div", {
-    className: "dl-kpis"
-  }, React.createElement(Kpi, {
-    label: "Diesel issued",
-    value: fmt(siteTotalLitres, 1),
-    unit: "litres"
-  }), React.createElement(Kpi, {
-    label: "Fuel cost",
-    value: rates.HSD || rates.Petrol ? "₹ " + fmt(siteRoll.reduce((a, b) => a + b.litres * (rates[fuelOf(b.m)] || 0), 0), 0) : "—",
-    unit: rates.HSD || rates.Petrol ? `at this site's own rates${rates.HSD ? ` · HSD ₹${fmt(rates.HSD, 2)}` : ""}${rates.Petrol ? ` · Petrol ₹${fmt(rates.Petrol, 2)}` : ""}` : "no rate entered on any receipt"
-  }), React.createElement(Kpi, {
-    label: "Equipment cost",
-    value: "₹ " + fmt(machines.reduce((a, m) => a + (ownerOf(m) === "Hired" ? rentFor(m, month === "all" ? null : month) : num(m.ownCost)), 0), 0),
-    unit: `per month · ${machines.filter(m => ownerOf(m) === "Hired").length} hired + ${machines.filter(m => ownerOf(m) !== "Hired" && num(m.ownCost) > 0).length} own costed`
-  }), React.createElement(Kpi, {
-    label: "Machines over norm",
-    value: siteRoll.filter(r => r.status === "over").length,
-    unit: `of ${machines.length}`,
-    alert: siteRoll.some(r => r.status === "over")
-  })), machines.length === 0 ? React.createElement("p", {
+  }, "Export CSV"))), machines.length === 0 ? React.createElement("p", {
     className: "dl-hint"
   }, "No machines or subcontractors on this site yet. Add the first fuel user to open its logbook.") : React.createElement("div", {
     className: "dl-tablewrap"
