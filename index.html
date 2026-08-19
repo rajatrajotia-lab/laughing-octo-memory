@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.3.44" />
+<meta name="app-version" content="1.3.45" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -441,7 +441,7 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const APP_VERSION = "1.3.44";
+const APP_VERSION = "1.3.45";
 const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
 const cmpVer = (a, b) => {
   const x = String(a || "").split(".").map(Number);
@@ -3345,6 +3345,7 @@ function Dashboard({
     const avg = km ? litres > 0 && run > 0 ? run / litres : null : run > 0 ? litres / run : null;
     const norm = num(m.norm);
     const bad = norm > 0 && avg !== null ? km ? avg < norm * 0.95 : avg > norm * 1.05 : false;
+    const varPct = norm > 0 && avg !== null && avg > 0 ? ((km ? norm / avg : avg / norm) - 1) * 100 : null;
     return {
       litres,
       run,
@@ -3352,7 +3353,8 @@ function Dashboard({
       avg,
       km,
       norm,
-      bad
+      bad,
+      varPct
     };
   })();
   const machDaily = useMemo(() => {
@@ -3878,6 +3880,11 @@ function Dashboard({
     value: machTotals.avg === null ? "—" : fmt(machTotals.avg, 2),
     unit: (machTotals.km ? "km/L" : "L/hr") + (machTotals.norm > 0 ? ` · norm ${fmt(machTotals.norm, 2)}` : " · no norm set"),
     alert: machTotals.bad
+  }), React.createElement(Kpi, {
+    label: "Against standard",
+    value: machTotals.varPct === null ? "—" : (machTotals.varPct >= 0 ? "+" : "−") + fmt(Math.abs(machTotals.varPct), 1) + "%",
+    unit: machTotals.varPct === null ? "needs a norm and running data" : machTotals.varPct >= 0 ? "above standard — consuming more than norm" : "below standard — better than norm",
+    alert: machTotals.varPct !== null && machTotals.varPct > 5
   })), tab === "machsp" && React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
