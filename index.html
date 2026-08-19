@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.3.43" />
+<meta name="app-version" content="1.3.44" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -441,7 +441,7 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const APP_VERSION = "1.3.43";
+const APP_VERSION = "1.3.44";
 const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
 const cmpVer = (a, b) => {
   const x = String(a || "").split(".").map(Number);
@@ -3335,6 +3335,26 @@ function Dashboard({
       litres: +by[k].toFixed(1)
     }));
   }, [tab, scopeSiteId, scopeMachId, data, fuel]);
+  const machTotals = (() => {
+    if (tab !== "machsp" || !scopeMachEntry) return null;
+    const m = scopeMachEntry.m;
+    const litres = scopedRows.reduce((a, b) => a + b.litres, 0);
+    const run = scopedRows.reduce((a, b) => a + (b.run || 0), 0);
+    const entries = scopedRows.reduce((a, b) => a + (b.count || 0), 0);
+    const km = m.meterType === "km";
+    const avg = km ? litres > 0 && run > 0 ? run / litres : null : run > 0 ? litres / run : null;
+    const norm = num(m.norm);
+    const bad = norm > 0 && avg !== null ? km ? avg < norm * 0.95 : avg > norm * 1.05 : false;
+    return {
+      litres,
+      run,
+      entries,
+      avg,
+      km,
+      norm,
+      bad
+    };
+  })();
   const machDaily = useMemo(() => {
     if (tab !== "machsp" || !scopeMachEntry) return [];
     const m = scopeMachEntry.m;
@@ -3843,7 +3863,22 @@ function Dashboard({
     maxBarSize: 60
   })))), React.createElement("p", {
     className: "dl-legend"
-  }, "Kept apart from the fuel figures above. Hired is the committed hire per month at current rates; Own is the owning cost entered against own machines. Click any card for the site-wise and machine-wise break-up.")), tab === "machsp" && React.createElement("div", {
+  }, "Kept apart from the fuel figures above. Hired is the committed hire per month at current rates; Own is the owning cost entered against own machines. Click any card for the site-wise and machine-wise break-up.")), tab === "machsp" && machTotals && React.createElement("div", {
+    className: "dl-kpis"
+  }, React.createElement(Kpi, {
+    label: fuel + " issued",
+    value: fmt(machTotals.litres, 1),
+    unit: "litres · " + (month === "all" ? "all months" : monthLabel(month))
+  }), React.createElement(Kpi, {
+    label: machTotals.km ? "Distance run" : "Hours run",
+    value: fmt(machTotals.run, 1),
+    unit: (machTotals.km ? "km" : "hours") + ` · ${machTotals.entries} entr` + (machTotals.entries === 1 ? "y" : "ies")
+  }), React.createElement(Kpi, {
+    label: "Average consumption",
+    value: machTotals.avg === null ? "—" : fmt(machTotals.avg, 2),
+    unit: (machTotals.km ? "km/L" : "L/hr") + (machTotals.norm > 0 ? ` · norm ${fmt(machTotals.norm, 2)}` : " · no norm set"),
+    alert: machTotals.bad
+  })), tab === "machsp" && React.createElement("div", {
     className: "dl-block"
   }, React.createElement("h3", {
     className: "dl-blockhead"
