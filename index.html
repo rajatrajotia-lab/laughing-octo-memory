@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.3.48" />
+<meta name="app-version" content="1.3.49" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -441,7 +441,7 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const APP_VERSION = "1.3.48";
+const APP_VERSION = "1.3.49";
 const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
 const cmpVer = (a, b) => {
   const x = String(a || "").split(".").map(Number);
@@ -1222,7 +1222,8 @@ function mergeBundle(d, bundle, mode) {
     }
     siteMap[bs.id] = local.id;
     (bs.machines || []).forEach(bm => {
-      let lm = local.machines.find(m => m.id === bm.id) || bm.code && local.machines.find(m => norm(m.code) === norm(bm.code)) || local.machines.find(m => norm(m.name) === norm(bm.name));
+      const fz = s => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      let lm = local.machines.find(m => m.id === bm.id) || bm.code && local.machines.find(m => norm(m.code) === norm(bm.code)) || local.machines.find(m => norm(m.name) === norm(bm.name)) || local.machines.find(m => fz(m.name) === fz(bm.name) && fz(m.code) === fz(bm.code));
       if (!lm) {
         lm = deep(bm);
         if (allLocalMachineIds().has(lm.id)) lm.id = uid();
@@ -2125,6 +2126,60 @@ function DieselLogbook() {
     };
     update(d => {
       const resync = [];
+      const fuzz = s => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      d.sites.forEach(s => {
+        const groups = {};
+        s.machines.forEach(m => {
+          const k = fuzz(m.name) + "|" + fuzz(m.code) + "|" + (m.fuel || "HSD");
+          (groups[k] = groups[k] || []).push(m);
+        });
+        Object.values(groups).forEach(g => {
+          if (g.length < 2) return;
+          const refCount = m => (d.stock[s.id] || []).reduce((a, day) => a + (num((day.issues || {})[m.id]) > 0 ? 1 : 0), 0);
+          g.sort((a, b) => refCount(b) - refCount(a) || (d.logs[b.id] || []).length - (d.logs[a.id] || []).length);
+          const keeper = g[0];
+          g.slice(1).forEach(dup => {
+            const dl = d.logs[dup.id] || [];
+            const kl = d.logs[keeper.id] = d.logs[keeper.id] || [];
+            const overlap = dl.filter(e => kl.some(l => l.date === e.date && String(l.litres || "") === String(e.litres || ""))).length;
+            if (dl.length && overlap < dl.length / 2) return;
+            dl.forEach(e => {
+              const twin = kl.some(l => l.date === e.date && String(l.litres || "") === String(e.litres || ""));
+              if (twin) {
+                counter.n++;
+                resync.push({
+                  mid: keeper.id,
+                  date: e.date,
+                  siteId: s.id
+                });
+              } else {
+                kl.push({
+                  ...e,
+                  siteId: s.id
+                });
+              }
+            });
+            delete d.logs[dup.id];
+            if (d.maint && d.maint[dup.id]) {
+              d.maint[keeper.id] = (d.maint[keeper.id] || []).concat(d.maint[dup.id]);
+              delete d.maint[dup.id];
+            }
+            (d.stock[s.id] || []).forEach(day => {
+              if (day.issues && day.issues[dup.id] !== undefined) {
+                day.issues[keeper.id] = +(num(day.issues[keeper.id]) + num(day.issues[dup.id])).toFixed(2);
+                delete day.issues[dup.id];
+                resync.push({
+                  mid: keeper.id,
+                  date: day.date,
+                  siteId: s.id
+                });
+              }
+            });
+            s.machines = s.machines.filter(mm => mm.id !== dup.id);
+            counter.m = (counter.m || 0) + 1;
+          });
+        });
+      });
       Object.keys(d.logs || {}).forEach(mid => {
         const seen = new Set();
         const keep = [];
@@ -2189,7 +2244,10 @@ function DieselLogbook() {
         if (m && sid) syncStockIssue(d, sid, m, x.date);
       });
     });
-    setNote(counter.n ? `Removed ${counter.n} duplicate entr${counter.n === 1 ? "y" : "ies"} and corrected the fuel register.` : "No duplicate entries found — the logbooks are clean.");
+    const bits = [];
+    if (counter.m) bits.push(`merged ${counter.m} duplicate machine${counter.m === 1 ? "" : "s"}`);
+    if (counter.n) bits.push(`removed ${counter.n} duplicate entr${counter.n === 1 ? "y" : "ies"}`);
+    setNote(bits.length ? `Repair done — ${bits.join(", ")}, fuel register corrected.` : "No duplicates found — machines and logbooks are clean.");
   };
   const askDedupe = () => setAsk({
     title: "Remove duplicate entries",
