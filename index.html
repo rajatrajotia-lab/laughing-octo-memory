@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.3.47" />
+<meta name="app-version" content="1.3.48" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -441,7 +441,7 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const APP_VERSION = "1.3.47";
+const APP_VERSION = "1.3.48";
 const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
 const cmpVer = (a, b) => {
   const x = String(a || "").split(".").map(Number);
@@ -1251,6 +1251,13 @@ function mergeBundle(d, bundle, mode) {
           if (twin >= 0) {
             report.skipped += 1;
             return;
+          }
+          if (String(e.open || "") === "" && String(e.close || "") === "") {
+            const ghostOf = logs.findIndex(l => l.date === e.date && String(l.litres || "") === String(e.litres || "") && String(l.open || "") !== "" && String(l.close || "") !== "");
+            if (ghostOf >= 0) {
+              report.skipped += 1;
+              return;
+            }
           }
         }
         if (j >= 0) {
@@ -2136,6 +2143,38 @@ function DieselLogbook() {
           keep.push(e);
         });
         d.logs[mid] = keep;
+      });
+      /* second pass: an entry with no meter readings that repeats the same
+         machine, date and litres as a fully-detailed entry is an import
+         ghost from an older file — remove the blank copy. */
+      Object.keys(d.logs || {}).forEach(mid => {
+        const list = d.logs[mid] || [];
+        const byKey = {};
+        list.forEach(e => {
+          const k = e.date + "|" + String(e.litres || "");
+          (byKey[k] = byKey[k] || []).push(e);
+        });
+        const drop = new Set();
+        Object.values(byKey).forEach(group => {
+          if (group.length < 2) return;
+          const withR = group.filter(e => String(e.open || "") !== "" && String(e.close || "") !== "");
+          const withoutR = group.filter(e => String(e.open || "") === "" && String(e.close || "") === "");
+          if (withR.length >= 1 && withoutR.length >= 1) withoutR.forEach(e => drop.add(e.id));
+        });
+        if (drop.size) {
+          d.logs[mid] = list.filter(e => {
+            if (drop.has(e.id)) {
+              counter.n++;
+              resync.push({
+                mid,
+                date: e.date,
+                siteId: e.siteId
+              });
+              return false;
+            }
+            return true;
+          });
+        }
       });
       resync.forEach(x => {
         let m = null,
