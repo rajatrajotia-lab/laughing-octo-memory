@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.3.49" />
+<meta name="app-version" content="1.3.50" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -441,7 +441,7 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const APP_VERSION = "1.3.49";
+const APP_VERSION = "1.3.50";
 const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
 const cmpVer = (a, b) => {
   const x = String(a || "").split(".").map(Number);
@@ -1223,7 +1223,7 @@ function mergeBundle(d, bundle, mode) {
     siteMap[bs.id] = local.id;
     (bs.machines || []).forEach(bm => {
       const fz = s => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-      let lm = local.machines.find(m => m.id === bm.id) || bm.code && local.machines.find(m => norm(m.code) === norm(bm.code)) || local.machines.find(m => norm(m.name) === norm(bm.name)) || local.machines.find(m => fz(m.name) === fz(bm.name) && fz(m.code) === fz(bm.code));
+      let lm = local.machines.find(m => m.id === bm.id) || bm.code && local.machines.find(m => norm(m.code) === norm(bm.code)) || local.machines.find(m => norm(m.name) === norm(bm.name) && norm(m.code || "") === norm(bm.code || "")) || local.machines.find(m => fz(m.name) === fz(bm.name) && fz(m.code) === fz(bm.code));
       if (!lm) {
         lm = deep(bm);
         if (allLocalMachineIds().has(lm.id)) lm.id = uid();
@@ -2124,7 +2124,8 @@ function DieselLogbook() {
     const counter = {
       n: 0
     };
-    update(d => {
+    const d = JSON.parse(JSON.stringify(data));
+    {
       const resync = [];
       const fuzz = s => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
       d.sites.forEach(s => {
@@ -2231,6 +2232,84 @@ function DieselLogbook() {
           });
         }
       });
+      /* pass: re-home entries to the site whose register issued their fuel.
+         A machine transferred between sites can leave entries tagged to the
+         new site while the old site's tank book holds the issues. */
+      const dayFor = (sid, date, f) => (d.stock[sid] || []).find(x => x.date === date && (x.fuel || "HSD") === f);
+      const allM = d.sites.flatMap(s => s.machines.map(m => ({
+        m,
+        home: s.id
+      })));
+      allM.forEach(({
+        m,
+        home
+      }) => {
+        const f = fuelOf(m);
+        const byDate = {};
+        (d.logs[m.id] || []).forEach(e => {
+          if (!isDirect(e)) (byDate[e.date] = byDate[e.date] || []).push(e);
+        });
+        Object.keys(byDate).forEach(date => {
+          const regSites = d.sites.filter(s => {
+            const day = dayFor(s.id, date, f);
+            return day && num((day.issues || {})[m.id]) > 0;
+          });
+          if (regSites.length !== 1) return;
+          const target = regSites[0].id;
+          byDate[date].forEach(e => {
+            if ((e.siteId || home) !== target) {
+              e.siteId = target;
+              counter.r = (counter.r || 0) + 1;
+            }
+          });
+        });
+      });
+      /* pass: make the register follow the logbook for any machine-day where
+         they disagree — missing or mismatched amounts — only when the whole
+         entry set for that day sits on one site, no other site's register
+         holds issues for it, and the stock chain stays sound. */
+      allM.forEach(({
+        m,
+        home
+      }) => {
+        const f = fuelOf(m);
+        const byDate = {};
+        (d.logs[m.id] || []).forEach(e => {
+          if (!isDirect(e) && num(e.litres) > 0) (byDate[e.date] = byDate[e.date] || []).push(e);
+        });
+        Object.keys(byDate).forEach(date => {
+          const tags = [...new Set(byDate[date].map(e => e.siteId || home))];
+          if (tags.length !== 1) return;
+          const sid = tags[0];
+          const siteObj = d.sites.find(s => s.id === sid);
+          if (!siteObj) return;
+          const elsewhere = d.sites.some(s => {
+            if (s.id === sid) return false;
+            const day = dayFor(s.id, date, f);
+            return day && num((day.issues || {})[m.id]) > 0;
+          });
+          if (elsewhere) {
+            const hereDay0 = dayFor(sid, date, f);
+            const cur0 = hereDay0 ? num((hereDay0.issues || {})[m.id]) : 0;
+            const exp0 = byDate[date].reduce((a, e) => a + num(e.litres), 0);
+            if (Math.abs(exp0 - cur0) > 0.01) counter.a = (counter.a || 0) + 1;
+            return;
+          }
+          const expected = byDate[date].reduce((a, e) => a + num(e.litres), 0);
+          const hereDay = dayFor(sid, date, f);
+          const current = hereDay ? num((hereDay.issues || {})[m.id]) : 0;
+          if (Math.abs(expected - current) < 0.01) return;
+          const before = JSON.parse(JSON.stringify(d.stock[sid] || []));
+          syncStockIssue(d, sid, m, date);
+          const short = chainShort(d.stock[sid] || [], siteObj, f);
+          if (short) {
+            d.stock[sid] = before;
+            counter.s = (counter.s || 0) + 1;
+          } else {
+            counter.p = (counter.p || 0) + 1;
+          }
+        });
+      });
       resync.forEach(x => {
         let m = null,
           sid = x.siteId;
@@ -2243,11 +2322,16 @@ function DieselLogbook() {
         });
         if (m && sid) syncStockIssue(d, sid, m, x.date);
       });
-    });
+    }
+    setData(d);
     const bits = [];
     if (counter.m) bits.push(`merged ${counter.m} duplicate machine${counter.m === 1 ? "" : "s"}`);
     if (counter.n) bits.push(`removed ${counter.n} duplicate entr${counter.n === 1 ? "y" : "ies"}`);
-    setNote(bits.length ? `Repair done — ${bits.join(", ")}, fuel register corrected.` : "No duplicates found — machines and logbooks are clean.");
+    if (counter.r) bits.push(`re-homed ${counter.r} entr${counter.r === 1 ? "y" : "ies"} to the issuing site`);
+    if (counter.p) bits.push(`posted ${counter.p} missing day${counter.p === 1 ? "" : "s"} into the register`);
+    if (counter.s) bits.push(`left ${counter.s} unposted (would overdraw the tank)`);
+    if (counter.a) bits.push(`${counter.a} day${counter.a === 1 ? "" : "s"} booked at two sites need a manual look`);
+    setNote(bits.length ? `Repair done — ${bits.join(", ")}. Fuel register corrected.` : "Nothing to repair — machines, logbooks and register agree.");
   };
   const askDedupe = () => setAsk({
     title: "Remove duplicate entries",
