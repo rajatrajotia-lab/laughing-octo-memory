@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.3.46" />
+<meta name="app-version" content="1.3.47" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -441,7 +441,7 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const APP_VERSION = "1.3.46";
+const APP_VERSION = "1.3.47";
 const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
 const cmpVer = (a, b) => {
   const x = String(a || "").split(".").map(Number);
@@ -1245,7 +1245,14 @@ function mergeBundle(d, bundle, mode) {
       incoming.forEach(be => {
         const e = deep(be);
         if (e.siteId && siteMap[e.siteId]) e.siteId = siteMap[e.siteId];
-        const j = logs.findIndex(l => l.id === e.id);
+        let j = logs.findIndex(l => l.id === e.id);
+        if (j < 0) {
+          const twin = logs.findIndex(l => l.date === e.date && String(l.open || "") === String(e.open || "") && String(l.close || "") === String(e.close || "") && String(l.litres || "") === String(e.litres || "") && (l.source || "Site tank") === (e.source || "Site tank"));
+          if (twin >= 0) {
+            report.skipped += 1;
+            return;
+          }
+        }
         if (j >= 0) {
           if (mode === "replace" || mode === "replaceAll") {
             logs[j] = e;
@@ -2104,6 +2111,53 @@ function DieselLogbook() {
     const s = d.sites.find(x => x.id === siteId);
     const m = s && s.machines.find(x => x.id === machineId);
     if (m) Object.assign(m, fields);
+  });
+  const dedupeEntries = () => {
+    const counter = {
+      n: 0
+    };
+    update(d => {
+      const resync = [];
+      Object.keys(d.logs || {}).forEach(mid => {
+        const seen = new Set();
+        const keep = [];
+        (d.logs[mid] || []).forEach(e => {
+          const k = [e.date, String(e.open || ""), String(e.close || ""), String(e.litres || ""), e.source || "Site tank"].join("|");
+          if (seen.has(k)) {
+            counter.n++;
+            resync.push({
+              mid,
+              date: e.date,
+              siteId: e.siteId
+            });
+            return;
+          }
+          seen.add(k);
+          keep.push(e);
+        });
+        d.logs[mid] = keep;
+      });
+      resync.forEach(x => {
+        let m = null,
+          sid = x.siteId;
+        d.sites.forEach(s => {
+          const f = s.machines.find(mm => mm.id === x.mid);
+          if (f) {
+            m = f;
+            if (!sid) sid = s.id;
+          }
+        });
+        if (m && sid) syncStockIssue(d, sid, m, x.date);
+      });
+    });
+    setNote(counter.n ? `Removed ${counter.n} duplicate entr${counter.n === 1 ? "y" : "ies"} and corrected the fuel register.` : "No duplicate entries found — the logbooks are clean.");
+  };
+  const askDedupe = () => setAsk({
+    title: "Remove duplicate entries",
+    body: "This scans every logbook for entries that repeat the same machine, date, readings and litres, keeps one copy of each and deletes the extras, then corrects the fuel register. There is no undo — check the result, then press Save.",
+    label: "Scan and remove duplicates",
+    danger: true,
+    run: dedupeEntries
   });
   const resetAll = () => requireAuth("Clear all data", "Clearing the register is restricted. Enter the management passcode.", () => reallyResetAsk());
   const reallyResetAsk = () => {
@@ -3216,6 +3270,7 @@ function DieselLogbook() {
     data: data,
     onMerge: mergeIn,
     onReset: resetAll,
+    onDedupe: askDedupe,
     onSetDevice: id => requireAuth("Change device role", "Changing what this device holds is restricted.", () => update(d => {
       d.device = id ? {
         role: "site",
@@ -6712,6 +6767,7 @@ function DataTransfer({
   data,
   onMerge,
   onReset,
+  onDedupe,
   onSetPass,
   onSetDevice,
   onClose
@@ -6886,7 +6942,13 @@ function DataTransfer({
     className: "dl-hint"
   }, "The download opens in the phone's browser. Open the downloaded file to install \u2014 your entries are kept."), upd && upd.state === "restart" && React.createElement("p", {
     className: "dl-hint"
-  }, "The update is installed on this computer. Restarting the view loads it; other devices on the WiFi get it when they refresh.")), React.createElement("section", {
+  }, "The update is installed on this computer. Restarting the view loads it; other devices on the WiFi get it when they refresh.")), React.createElement("section", null, React.createElement("h4", null, "Repair"), React.createElement("p", null, "If the same entries appear twice (usually after importing an old file), this removes the extra copies and corrects the fuel register."), React.createElement("button", {
+    className: "dl-btn ghost",
+    onClick: () => {
+      onClose();
+      onDedupe();
+    }
+  }, "Remove duplicate entries")), React.createElement("section", {
     className: "dl-access"
   }, React.createElement("h4", null, "Management passcode"), React.createElement("p", null, hasPasscode(data) ? "A passcode is set. The company dashboard and anything that deletes data ask for it, and the app relocks after twenty minutes idle." : "No passcode is set, so the company dashboard and the delete controls are open to anyone using this device."), React.createElement("button", {
     className: "dl-btn ghost",
