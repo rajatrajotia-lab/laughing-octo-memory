@@ -7,7 +7,7 @@
 
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#12294A" />
-<meta name="app-version" content="1.3.53" />
+<meta name="app-version" content="1.3.54" />
 <link rel="icon" href="icon-192.png" />
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI5NiIgZmlsbD0iIzBDMkIyNSIvPgo8cmVjdCB4PSIxNDAiIHk9IjEyMCIgd2lkdGg9IjE3MCIgaGVpZ2h0PSIyNzUiIHJ4PSIyMiIgZmlsbD0iI0M4NkExNSIvPgo8cmVjdCB4PSIxNjUiIHk9IjE1MCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4NSIgcng9IjEyIiBmaWxsPSIjRkZGRkZGIi8+CjxyZWN0IHg9IjEzMCIgeT0iMzk1IiB3aWR0aD0iMTkwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjRkZGRkZGIiBvcGFjaXR5PSIwLjkyIi8+CjxwYXRoIGQ9Ik0zMTAgMjQwIHE3NSAwIDc1IDc1IHYtMTMwIiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS13aWR0aD0iMjAiIGZpbGw9Im5vbmUiLz4KPHJlY3QgeD0iMzY4IiB5PSIxMzUiIHdpZHRoPSI2MiIgaGVpZ2h0PSI0NSIgcng9IjEwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==" sizes="any" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -441,7 +441,7 @@ const fmt = (n, d = 2) => n === null || n === undefined || isNaN(n) ? "—" : Nu
   maximumFractionDigits: d
 });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const APP_VERSION = "1.3.53";
+const APP_VERSION = "1.3.54";
 const RELEASES_API = "https://api.github.com/repos/rajatrajotia-lab/laughing-octo-memory/releases/latest";
 const cmpVer = (a, b) => {
   const x = String(a || "").split(".").map(Number);
@@ -2188,11 +2188,11 @@ function DieselLogbook() {
     const m = s && s.machines.find(x => x.id === machineId);
     if (m) Object.assign(m, fields);
   });
-  const dedupeEntries = () => {
+  const computeRepair = src => {
     const counter = {
       n: 0
     };
-    const d = JSON.parse(JSON.stringify(data));
+    const d = JSON.parse(JSON.stringify(src));
     {
       const resync = [];
       const fuzz = s => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -2409,7 +2409,12 @@ function DieselLogbook() {
         if (m && sid) syncStockIssue(d, sid, m, x.date);
       });
     }
-    setData(d);
+    return {
+      d,
+      counter
+    };
+  };
+  const repairNote = counter => {
     const bits = [];
     if (counter.m) bits.push(`merged ${counter.m} duplicate machine${counter.m === 1 ? "" : "s"}`);
     if (counter.n) bits.push(`removed ${counter.n} duplicate entr${counter.n === 1 ? "y" : "ies"}`);
@@ -2418,6 +2423,12 @@ function DieselLogbook() {
     if (counter.s) bits.push(`left ${counter.s} unposted (would overdraw the tank)`);
     if (counter.o) bits.push(`cleared ${counter.o} double-written "other fuel out" line${counter.o === 1 ? "" : "s"}`);
     if (counter.a) bits.push(`${counter.a} day${counter.a === 1 ? "" : "s"} booked at two sites need a manual look`);
+    return bits;
+  };
+  const dedupeEntries = () => {
+    const res = computeRepair(data);
+    setData(res.d);
+    const bits = repairNote(res.counter);
     setNote(bits.length ? `Repair done — ${bits.join(", ")}. Fuel register corrected.` : "Nothing to repair — machines, logbooks and register agree.");
   };
   const askDedupe = () => setAsk({
@@ -2464,6 +2475,28 @@ function DieselLogbook() {
     setData(copy);
     if (copy.sites.length && !copy.sites.find(x => x.id === siteId)) setSiteId(copy.sites[0].id);
     setNote("Merge complete.");
+    /* After every import, scan the whole register for duplicates and ask
+       before touching anything — nothing is removed without permission. */
+    setTimeout(() => {
+      try {
+        const res = computeRepair(copy);
+        const c = res.counter;
+        const dupes = (c.m || 0) + (c.n || 0) + (c.o || 0);
+        if (!dupes) return;
+        setDialog(null);
+        setAsk({
+          title: "Duplicate entries detected",
+          body: `After this import the register holds ${dupes} duplicate record${dupes === 1 ? "" : "s"} — repeated logbook entries, twin machines or double-written fuel lines. Remove the extra copies and correct the fuel register? Nothing changes until you agree, and it is stored only when you press Save.`,
+          label: "Yes, remove duplicates",
+          danger: true,
+          run: () => {
+            setData(res.d);
+            const bits = repairNote(res.counter);
+            setNote(bits.length ? `Cleaned after import — ${bits.join(", ")}.` : "Cleaned after import.");
+          }
+        });
+      } catch (e) {}
+    }, 250);
     return report;
   };
   const setMachineField = (siteId, mId, field, value) => update(d => {
